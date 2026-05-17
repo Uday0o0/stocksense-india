@@ -5,7 +5,7 @@ import yfinance as yf
 import pickle
 import os
 from datetime import datetime, timedelta
-from keras.models import load_model
+from tf_keras.models import load_model
 import plotly.graph_objects as go
 
 # ─── PAGE CONFIG ────────────────────────────────────────────────────────────────
