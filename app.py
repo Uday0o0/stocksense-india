@@ -199,13 +199,23 @@ LOOKBACK = 60
 
 # ─── HELPERS ─────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
+@st.cache_data(ttl=300)
 def load_data(ticker):
-    data = yf.download(ticker, start="2010-01-01",
-                       end=datetime.today().strftime("%Y-%m-%d"), progress=False)
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
-    data.reset_index(inplace=True)
-    return data
+    for attempt in range(3):
+        try:
+            data = yf.download(ticker, start="2010-01-01",
+                               end=datetime.today().strftime("%Y-%m-%d"),
+                               progress=False, timeout=30)
+            if data.empty:
+                continue
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
+            data.reset_index(inplace=True)
+            return data
+        except Exception:
+            if attempt == 2:
+                return None
+    return None
 
 @st.cache_resource
 def load_onnx_session(model_name):
