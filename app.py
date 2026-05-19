@@ -4,8 +4,8 @@ import pandas as pd
 import yfinance as yf
 import pickle
 import os
+import onnxruntime as ort
 from datetime import datetime, timedelta
-from tf_keras.models import load_model
 import plotly.graph_objects as go
 
 # ─── PAGE CONFIG ────────────────────────────────────────────────────────────────
@@ -208,14 +208,18 @@ def load_data(ticker):
     return data
 
 @st.cache_resource
-def load_model_and_scaler(model_name):
-    model_path  = os.path.join(SAVE_DIR, f"{model_name}_model.keras")
+def load_onnx_session(model_name):
+    onnx_path = os.path.join(SAVE_DIR, f"{model_name}.onnx")
+    if not os.path.exists(onnx_path):
+        return None
+    return ort.InferenceSession(onnx_path)
+
+@st.cache_resource
+def load_scaler(model_name):
     scaler_path = os.path.join(SAVE_DIR, f"{model_name}_scaler.pkl")
-    if not os.path.exists(model_path) or not os.path.exists(scaler_path):
-        return None, None
-    model  = load_model(model_path)
-    scaler = pickle.load(open(scaler_path, "rb"))
-    return model, scaler
+    if not os.path.exists(scaler_path):
+        return None
+    return pickle.load(open(scaler_path, "rb"))
 
 def calc_rsi(source, length=14):
     change   = pd.Series(source).diff()
@@ -270,11 +274,13 @@ def next_trading_day(from_date):
         d += timedelta(days=1)
     return d
 
-def predict_tomorrow(model, scaler, df):
+def predict_tomorrow(session, scaler, df):
     close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
     scaled = scaler.transform(close)
-    seq    = scaled[-LOOKBACK:].reshape(1, LOOKBACK, 1)
-    pred   = model.predict(seq, verbose=0)
+    seq    = scaled[-LOOKBACK:].reshape(1, LOOKBACK, 1).astype(np.float32)
+    input_name  = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
+    pred   = session.run([output_name], {input_name: seq})[0]
     price  = scaler.inverse_transform(pred)[0][0]
     return float(price)
 
@@ -333,7 +339,7 @@ with col_title:
     st.markdown(
         f"## {stock_name} &nbsp;"
         f"<span style='font-size:0.8rem;color:#3A5070;font-family:Space Mono'>{ticker}</span>"
-        f"<span class='model-badge'>LSTM v1</span>",
+        f"<span class='model-badge'>LSTM · ONNX</span>",
         unsafe_allow_html=True
     )
 with col_refresh:
@@ -365,15 +371,16 @@ chg_symbol   = "▲" if day_change >= 0 else "▼"
 
 # ─── PREDICTION ──────────────────────────────────────────────────────────────────
 with st.spinner(f"Running LSTM prediction for {stock_name}..."):
-    model, scaler = load_model_and_scaler(model_name)
+    session = load_onnx_session(model_name)
+    scaler  = load_scaler(model_name)
 
 pred_price  = None
 pred_change = None
 pred_pct    = None
 pred_day    = None
 
-if model is not None:
-    pred_price  = predict_tomorrow(model, scaler, df)
+if session is not None and scaler is not None:
+    pred_price  = predict_tomorrow(session, scaler, df)
     pred_change = pred_price - latest_close
     pred_pct    = (pred_change / latest_close) * 100
     pred_day    = next_trading_day(datetime.today())
@@ -406,7 +413,7 @@ with c2:
         <div class="metric-card">
             <div class="metric-label">Tomorrow's Prediction</div>
             <div class="metric-value" style="font-size:1rem;color:#3A5070;">Model not found</div>
-            <div class="metric-sub neutral">Run training notebook first</div>
+            <div class="metric-sub neutral">ONNX file missing</div>
         </div>""", unsafe_allow_html=True)
 
 with c3:
@@ -434,7 +441,6 @@ with c4:
 st.markdown('<div class="section-header">Price Chart · Bollinger Bands · Moving Averages</div>', unsafe_allow_html=True)
 
 fig_price = go.Figure()
-
 fig_price.add_trace(go.Candlestick(
     x=df_view["Date"],
     open=df_view["Open"], high=df_view["High"],
@@ -445,19 +451,16 @@ fig_price.add_trace(go.Candlestick(
 ))
 fig_price.add_trace(go.Scatter(
     x=df_view["Date"], y=df_view["BB_Upper"],
-    line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
-    name="BB Upper"
+    line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Upper"
 ))
 fig_price.add_trace(go.Scatter(
     x=df_view["Date"], y=df_view["BB_Lower"],
     fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
-    line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
-    name="BB Lower"
+    line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Lower"
 ))
 fig_price.add_trace(go.Scatter(
     x=df_view["Date"], y=df_view["BB_Mid"],
-    line=dict(color="rgba(0,217,245,0.5)", width=1),
-    name="BB Mid"
+    line=dict(color="rgba(0,217,245,0.5)", width=1), name="BB Mid"
 ))
 fig_price.add_trace(go.Scatter(
     x=df_view["Date"], y=df_view["MA50"],
@@ -467,7 +470,6 @@ fig_price.add_trace(go.Scatter(
     x=df_view["Date"], y=df_view["MA200"],
     line=dict(color="#FF6B9D", width=1.5), name="MA 200"
 ))
-
 if pred_price:
     fig_price.add_trace(go.Scatter(
         x=[pred_day], y=[pred_price],
@@ -487,7 +489,6 @@ st.plotly_chart(fig_price, use_container_width=True)
 
 # ─── INDICATORS ──────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">Indicators</div>', unsafe_allow_html=True)
-
 col_rsi, col_macd = st.columns(2)
 
 with col_rsi:
@@ -495,11 +496,10 @@ with col_rsi:
     fig_rsi.add_trace(go.Scatter(
         x=df_view["Date"], y=df_view["RSI"],
         line=dict(color=BLUE, width=1.8),
-        fill="tozeroy", fillcolor="rgba(0,217,245,0.05)",
-        name="RSI"
+        fill="tozeroy", fillcolor="rgba(0,217,245,0.05)", name="RSI"
     ))
-    fig_rsi.add_hline(y=70, line=dict(color=RED,   width=1, dash="dot"))
-    fig_rsi.add_hline(y=30, line=dict(color=GREEN, width=1, dash="dot"))
+    fig_rsi.add_hline(y=70, line=dict(color=RED,      width=1, dash="dot"))
+    fig_rsi.add_hline(y=30, line=dict(color=GREEN,    width=1, dash="dot"))
     fig_rsi.add_hline(y=50, line=dict(color=GRID_CLR, width=1, dash="dot"))
     l2 = base_layout("RSI (14)")
     l2["height"] = 200
@@ -531,10 +531,8 @@ with col_macd:
 
 # ─── VOLUME ──────────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
-
 vol_colors = [GREEN if df_view["Close"].iloc[i] >= df_view["Open"].iloc[i]
               else RED for i in range(len(df_view))]
-
 fig_vol = go.Figure()
 fig_vol.add_trace(go.Bar(
     x=df_view["Date"], y=df_view["Volume"],
@@ -550,7 +548,7 @@ st.plotly_chart(fig_vol, use_container_width=True)
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
     '<div style="text-align:center;font-family:Space Mono;font-size:0.62rem;color:#1E2D4A;">'
-    'StockSense India · LSTM v1 · 10 Models · Data via yfinance · For educational use only'
+    'StockSense India · LSTM · ONNX Runtime · Data via yfinance · For educational use only'
     '</div>',
     unsafe_allow_html=True
 )
