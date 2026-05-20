@@ -327,12 +327,6 @@ with st.sidebar:
     range_map = {"3 Months": 90, "6 Months": 180, "1 Year": 365, "2 Years": 730, "Max": 9999}
     days_back = range_map[range_option]
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown(
-        '<div class="warn-box">⚠️ For educational use only. Not financial advice.</div>',
-        unsafe_allow_html=True
-    )
-
 # ─── STOCK INFO ──────────────────────────────────────────────────────────────────
 ticker     = STOCKS[stock_name]["ticker"]
 model_name = STOCKS[stock_name]["model"]
@@ -550,7 +544,7 @@ st.plotly_chart(fig_vol, use_container_width=True)
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
     '<div style="text-align:center;font-family:Space Mono;font-size:0.62rem;color:#1E2D4A;">'
-    'StockSense India · LSTM · TensorFlow · Data via yfinance · For educational use only'
+    'StockSense India · LSTM · TensorFlow · Data via yfinance'
     '</div>',
     unsafe_allow_html=True
 )
