@@ -129,6 +129,32 @@ div.stButton > button:hover {
     background: rgba(0,245,160,0.08);
 }
 
+/* Tab styling */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    background-color: #0D1525 !important;
+    border-bottom: 1px solid #1E2D4A !important;
+    gap: 4px;
+}
+[data-testid="stTabs"] [data-baseweb="tab"] {
+    background-color: transparent !important;
+    color: #5A7499 !important;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.72rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-radius: 6px 6px 0 0 !important;
+    padding: 8px 20px !important;
+}
+[data-testid="stTabs"] [aria-selected="true"] {
+    background-color: #111C35 !important;
+    color: #00F5A0 !important;
+    border-bottom: 2px solid #00F5A0 !important;
+}
+[data-testid="stTabContent"] {
+    background-color: #090E1A !important;
+    padding-top: 16px !important;
+}
+
 hr { border-color: #1E2D4A !important; }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: #090E1A; }
@@ -176,6 +202,57 @@ hr { border-color: #1E2D4A !important; }
     color: #3A5070;
     letter-spacing: 0.15em;
     text-transform: uppercase;
+}
+
+.forecast-card {
+    background: linear-gradient(135deg, #0D1525 0%, #111C35 100%);
+    border: 1px solid #1E2D4A;
+    border-radius: 10px;
+    padding: 14px 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+.forecast-day {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    color: #5A7499;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+}
+.forecast-price {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #E0E6F0;
+}
+.forecast-change {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    margin-top: 4px;
+}
+
+.stat-box {
+    background: #0D1525;
+    border: 1px solid #1E2D4A;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+}
+.stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    color: #5A7499;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+.stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #E0E6F0;
+    margin-top: 2px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -279,13 +356,56 @@ def next_trading_day(from_date):
         d += timedelta(days=1)
     return d
 
+def get_trading_days(from_date, n):
+    days = []
+    d = from_date
+    while len(days) < n:
+        d = d + timedelta(days=1)
+        if d.weekday() < 5:
+            days.append(d)
+    return days
+
+def predict_one(model, scaler, sequence):
+    seq   = sequence[-LOOKBACK:].reshape(1, LOOKBACK, 1)
+    pred  = model.predict(seq, verbose=0)
+    price = scaler.inverse_transform(pred)[0][0]
+    return float(price)
+
 def predict_tomorrow(model, scaler, df):
     close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
     scaled = scaler.transform(close)
-    seq    = scaled[-LOOKBACK:].reshape(1, LOOKBACK, 1)
-    pred   = model.predict(seq, verbose=0)
-    price  = scaler.inverse_transform(pred)[0][0]
-    return float(price)
+    return predict_one(model, scaler, scaled)
+
+def predict_7days(model, scaler, df):
+    close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
+    scaled = scaler.transform(close).flatten().tolist()
+    preds  = []
+    seq    = scaled.copy()
+    for _ in range(7):
+        inp   = np.array(seq[-LOOKBACK:]).reshape(1, LOOKBACK, 1)
+        pred  = model.predict(inp, verbose=0)
+        price = float(scaler.inverse_transform(pred)[0][0])
+        scaled_val = float(scaler.transform([[price]])[0][0])
+        seq.append(scaled_val)
+        preds.append(price)
+    return preds
+
+def run_backtest(model, scaler, df, months):
+    close    = df["Close"].to_numpy().flatten().reshape(-1, 1)
+    scaled   = scaler.transform(close).flatten()
+    days     = int(months * 21)
+    start_i  = max(LOOKBACK, len(scaled) - days - 1)
+    actuals  = []
+    preds    = []
+    dates    = []
+    for i in range(start_i, len(scaled)):
+        seq   = scaled[i - LOOKBACK:i].reshape(1, LOOKBACK, 1)
+        pred  = model.predict(seq, verbose=0)
+        price = float(scaler.inverse_transform(pred)[0][0])
+        preds.append(price)
+        actuals.append(float(close[i][0]))
+        dates.append(df["Date"].iloc[i])
+    return dates, actuals, preds
 
 # ─── PLOTLY THEME ────────────────────────────────────────────────────────────────
 PLOT_BG  = "#090E1A"
@@ -295,6 +415,7 @@ GREEN    = "#00F5A0"
 RED      = "#FF4D6D"
 BLUE     = "#00D9F5"
 YELLOW   = "#F5C518"
+PURPLE   = "#B06DFF"
 
 def base_layout(title=""):
     return dict(
@@ -318,16 +439,22 @@ with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
 
     st.markdown('<div class="section-header">Select Stock</div>', unsafe_allow_html=True)
-    stock_name = st.selectbox("", list(STOCKS.keys()), label_visibility="collapsed")
+    stock_name = st.selectbox("Stock", list(STOCKS.keys()), label_visibility="collapsed")
 
     st.markdown('<div class="section-header">Chart Range</div>', unsafe_allow_html=True)
-    range_option = st.selectbox("", ["3 Months", "6 Months", "1 Year", "2 Years", "Max"],
+    range_option = st.selectbox("Range", ["3 Months", "6 Months", "1 Year", "2 Years", "Max"],
                                 label_visibility="collapsed")
 
     range_map = {"3 Months": 90, "6 Months": 180, "1 Year": 365, "2 Years": 730, "Max": 9999}
     days_back = range_map[range_option]
 
-# ─── STOCK INFO ──────────────────────────────────────────────────────────────────
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown(
+        '<div class="warn-box">⚠️ For educational use only. Not financial advice.</div>',
+        unsafe_allow_html=True
+    )
+
+# ─── HEADER ──────────────────────────────────────────────────────────────────────
 ticker     = STOCKS[stock_name]["ticker"]
 model_name = STOCKS[stock_name]["model"]
 
@@ -343,7 +470,7 @@ with col_refresh:
     st.markdown("<br>", unsafe_allow_html=True)
     st.button("↻ Refresh", use_container_width=True)
 
-# ─── LOAD DATA ───────────────────────────────────────────────────────────────────
+# ─── LOAD DATA & MODEL ───────────────────────────────────────────────────────────
 with st.spinner(f"Fetching {stock_name} data..."):
     df = load_data(ticker)
 
@@ -366,8 +493,7 @@ day_pct      = (day_change / prev_close) * 100
 chg_class    = "bullish" if day_change >= 0 else "bearish"
 chg_symbol   = "▲" if day_change >= 0 else "▼"
 
-# ─── PREDICTION ──────────────────────────────────────────────────────────────────
-with st.spinner(f"Running LSTM prediction for {stock_name}..."):
+with st.spinner(f"Loading LSTM model..."):
     model, scaler = load_model_and_scaler(model_name)
 
 pred_price  = None
@@ -433,118 +559,307 @@ with c4:
         <div class="metric-sub" style="margin-top:10px;color:#3A5070;">RSI + MA cross</div>
     </div>""", unsafe_allow_html=True)
 
-# ─── PRICE CHART ─────────────────────────────────────────────────────────────────
-st.markdown('<div class="section-header">Price Chart · Bollinger Bands · Moving Averages</div>', unsafe_allow_html=True)
+# ─── TABS ────────────────────────────────────────────────────────────────────────
+tab1, tab2, tab3 = st.tabs(["📈  Live Chart", "🔮  7-Day Forecast", "🧪  Backtest"])
 
-fig_price = go.Figure()
-fig_price.add_trace(go.Candlestick(
-    x=df_view["Date"],
-    open=df_view["Open"], high=df_view["High"],
-    low=df_view["Low"],   close=df_view["Close"],
-    increasing_line_color=GREEN, decreasing_line_color=RED,
-    increasing_fillcolor=GREEN,  decreasing_fillcolor=RED,
-    name="OHLC", opacity=0.85
-))
-fig_price.add_trace(go.Scatter(
-    x=df_view["Date"], y=df_view["BB_Upper"],
-    line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Upper"
-))
-fig_price.add_trace(go.Scatter(
-    x=df_view["Date"], y=df_view["BB_Lower"],
-    fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
-    line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Lower"
-))
-fig_price.add_trace(go.Scatter(
-    x=df_view["Date"], y=df_view["BB_Mid"],
-    line=dict(color="rgba(0,217,245,0.5)", width=1), name="BB Mid"
-))
-fig_price.add_trace(go.Scatter(
-    x=df_view["Date"], y=df_view["MA50"],
-    line=dict(color=YELLOW, width=1.5), name="MA 50"
-))
-fig_price.add_trace(go.Scatter(
-    x=df_view["Date"], y=df_view["MA200"],
-    line=dict(color="#FF6B9D", width=1.5), name="MA 200"
-))
-if pred_price:
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 1 — LIVE CHART
+# ════════════════════════════════════════════════════════════════════════════════
+with tab1:
+    st.markdown('<div class="section-header">Price Chart · Bollinger Bands · Moving Averages</div>', unsafe_allow_html=True)
+
+    fig_price = go.Figure()
+    fig_price.add_trace(go.Candlestick(
+        x=df_view["Date"],
+        open=df_view["Open"], high=df_view["High"],
+        low=df_view["Low"],   close=df_view["Close"],
+        increasing_line_color=GREEN, decreasing_line_color=RED,
+        increasing_fillcolor=GREEN,  decreasing_fillcolor=RED,
+        name="OHLC", opacity=0.85
+    ))
     fig_price.add_trace(go.Scatter(
-        x=[pred_day], y=[pred_price],
-        mode="markers+text",
-        marker=dict(color=GREEN, size=12, symbol="star",
-                    line=dict(color="white", width=1.5)),
-        text=[f"  ₹{pred_price:,.0f}"],
-        textfont=dict(color=GREEN, size=10, family="Space Mono"),
-        textposition="middle right",
-        name="LSTM Prediction"
+        x=df_view["Date"], y=df_view["BB_Upper"],
+        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Upper"
     ))
-
-l = base_layout()
-l["height"] = 440
-fig_price.update_layout(**l)
-st.plotly_chart(fig_price, use_container_width=True)
-
-# ─── INDICATORS ──────────────────────────────────────────────────────────────────
-st.markdown('<div class="section-header">Indicators</div>', unsafe_allow_html=True)
-col_rsi, col_macd = st.columns(2)
-
-with col_rsi:
-    fig_rsi = go.Figure()
-    fig_rsi.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["RSI"],
-        line=dict(color=BLUE, width=1.8),
-        fill="tozeroy", fillcolor="rgba(0,217,245,0.05)", name="RSI"
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["BB_Lower"],
+        fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
+        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Lower"
     ))
-    fig_rsi.add_hline(y=70, line=dict(color=RED,      width=1, dash="dot"))
-    fig_rsi.add_hline(y=30, line=dict(color=GREEN,    width=1, dash="dot"))
-    fig_rsi.add_hline(y=50, line=dict(color=GRID_CLR, width=1, dash="dot"))
-    l2 = base_layout("RSI (14)")
-    l2["height"] = 200
-    l2["yaxis"]["range"] = [0, 100]
-    l2["margin"] = dict(l=12, r=12, t=30, b=12)
-    fig_rsi.update_layout(**l2)
-    st.plotly_chart(fig_rsi, use_container_width=True)
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["BB_Mid"],
+        line=dict(color="rgba(0,217,245,0.5)", width=1), name="BB Mid"
+    ))
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["MA50"],
+        line=dict(color=YELLOW, width=1.5), name="MA 50"
+    ))
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["MA200"],
+        line=dict(color="#FF6B9D", width=1.5), name="MA 200"
+    ))
+    if pred_price:
+        fig_price.add_trace(go.Scatter(
+            x=[pred_day], y=[pred_price],
+            mode="markers+text",
+            marker=dict(color=GREEN, size=12, symbol="star",
+                        line=dict(color="white", width=1.5)),
+            text=[f"  ₹{pred_price:,.0f}"],
+            textfont=dict(color=GREEN, size=10, family="Space Mono"),
+            textposition="middle right",
+            name="LSTM Prediction"
+        ))
 
-with col_macd:
-    fig_macd = go.Figure()
-    colors_hist = [GREEN if v >= 0 else RED for v in df_view["Hist"].fillna(0)]
-    fig_macd.add_trace(go.Bar(
-        x=df_view["Date"], y=df_view["Hist"],
-        marker_color=colors_hist, name="Histogram", opacity=0.7
-    ))
-    fig_macd.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["MACD"],
-        line=dict(color=BLUE, width=1.5), name="MACD"
-    ))
-    fig_macd.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["Signal"],
-        line=dict(color=YELLOW, width=1.5), name="Signal"
-    ))
-    l3 = base_layout("MACD (12, 26, 9)")
-    l3["height"] = 200
-    l3["margin"] = dict(l=12, r=12, t=30, b=12)
-    fig_macd.update_layout(**l3)
-    st.plotly_chart(fig_macd, use_container_width=True)
+    l = base_layout()
+    l["height"] = 440
+    fig_price.update_layout(**l)
+    st.plotly_chart(fig_price, use_container_width=True)
 
-# ─── VOLUME ──────────────────────────────────────────────────────────────────────
-st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
-vol_colors = [GREEN if df_view["Close"].iloc[i] >= df_view["Open"].iloc[i]
-              else RED for i in range(len(df_view))]
-fig_vol = go.Figure()
-fig_vol.add_trace(go.Bar(
-    x=df_view["Date"], y=df_view["Volume"],
-    marker_color=vol_colors, opacity=0.7, name="Volume"
-))
-l4 = base_layout("Volume")
-l4["height"] = 160
-l4["margin"] = dict(l=12, r=12, t=30, b=12)
-fig_vol.update_layout(**l4)
-st.plotly_chart(fig_vol, use_container_width=True)
+    # RSI + MACD
+    st.markdown('<div class="section-header">Indicators</div>', unsafe_allow_html=True)
+    col_rsi, col_macd = st.columns(2)
+
+    with col_rsi:
+        fig_rsi = go.Figure()
+        fig_rsi.add_trace(go.Scatter(
+            x=df_view["Date"], y=df_view["RSI"],
+            line=dict(color=BLUE, width=1.8),
+            fill="tozeroy", fillcolor="rgba(0,217,245,0.05)", name="RSI"
+        ))
+        fig_rsi.add_hline(y=70, line=dict(color=RED,      width=1, dash="dot"))
+        fig_rsi.add_hline(y=30, line=dict(color=GREEN,    width=1, dash="dot"))
+        fig_rsi.add_hline(y=50, line=dict(color=GRID_CLR, width=1, dash="dot"))
+        l2 = base_layout("RSI (14)")
+        l2["height"] = 200
+        l2["yaxis"]["range"] = [0, 100]
+        l2["margin"] = dict(l=12, r=12, t=30, b=12)
+        fig_rsi.update_layout(**l2)
+        st.plotly_chart(fig_rsi, use_container_width=True)
+
+    with col_macd:
+        fig_macd = go.Figure()
+        colors_hist = [GREEN if v >= 0 else RED for v in df_view["Hist"].fillna(0)]
+        fig_macd.add_trace(go.Bar(
+            x=df_view["Date"], y=df_view["Hist"],
+            marker_color=colors_hist, name="Histogram", opacity=0.7
+        ))
+        fig_macd.add_trace(go.Scatter(
+            x=df_view["Date"], y=df_view["MACD"],
+            line=dict(color=BLUE, width=1.5), name="MACD"
+        ))
+        fig_macd.add_trace(go.Scatter(
+            x=df_view["Date"], y=df_view["Signal"],
+            line=dict(color=YELLOW, width=1.5), name="Signal"
+        ))
+        l3 = base_layout("MACD (12, 26, 9)")
+        l3["height"] = 200
+        l3["margin"] = dict(l=12, r=12, t=30, b=12)
+        fig_macd.update_layout(**l3)
+        st.plotly_chart(fig_macd, use_container_width=True)
+
+    # Volume
+    st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
+    vol_colors = [GREEN if df_view["Close"].iloc[i] >= df_view["Open"].iloc[i]
+                  else RED for i in range(len(df_view))]
+    fig_vol = go.Figure()
+    fig_vol.add_trace(go.Bar(
+        x=df_view["Date"], y=df_view["Volume"],
+        marker_color=vol_colors, opacity=0.7, name="Volume"
+    ))
+    l4 = base_layout("Volume")
+    l4["height"] = 160
+    l4["margin"] = dict(l=12, r=12, t=30, b=12)
+    fig_vol.update_layout(**l4)
+    st.plotly_chart(fig_vol, use_container_width=True)
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 2 — 7-DAY FORECAST
+# ════════════════════════════════════════════════════════════════════════════════
+with tab2:
+    if model is None:
+        st.error("Model not found. Please train first.")
+    else:
+        st.markdown('<div class="section-header">7-Day Price Forecast</div>', unsafe_allow_html=True)
+
+        with st.spinner("Generating 7-day forecast..."):
+            forecast_prices = predict_7days(model, scaler, df)
+
+        forecast_days = get_trading_days(datetime.today(), 7)
+
+        # Forecast cards
+        cols = st.columns(7)
+        for i, (col, price, day) in enumerate(zip(cols, forecast_prices, forecast_days)):
+            chg     = price - latest_close
+            pct     = (chg / latest_close) * 100
+            color   = "#00F5A0" if chg >= 0 else "#FF4D6D"
+            sym     = "▲" if chg >= 0 else "▼"
+            with col:
+                st.markdown(f"""
+                <div class="forecast-card">
+                    <div class="forecast-day">{day.strftime("%a")}<br>{day.strftime("%d %b")}</div>
+                    <div class="forecast-price">₹{price:,.0f}</div>
+                    <div class="forecast-change" style="color:{color}">{sym} {abs(pct):.1f}%</div>
+                </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Forecast chart
+        fig_fc = go.Figure()
+
+        # Last 30 days actual
+        last30 = df.tail(30)
+        fig_fc.add_trace(go.Scatter(
+            x=last30["Date"], y=last30["Close"],
+            line=dict(color=BLUE, width=2),
+            name="Actual Price"
+        ))
+
+        # Bridge from last actual to forecast
+        bridge_dates  = [df["Date"].iloc[-1]] + forecast_days
+        bridge_prices = [latest_close] + forecast_prices
+
+        fig_fc.add_trace(go.Scatter(
+            x=bridge_dates, y=bridge_prices,
+            line=dict(color=GREEN, width=2.5, dash="dot"),
+            mode="lines+markers",
+            marker=dict(color=GREEN, size=7, symbol="circle"),
+            name="7-Day Forecast"
+        ))
+
+        # Vertical line at today
+        fig_fc.add_vline(
+            x=df["Date"].iloc[-1],
+            line=dict(color="#5A7499", width=1, dash="dash")
+        )
+        fig_fc.add_annotation(
+            x=df["Date"].iloc[-1], y=latest_close,
+            text="  Today",
+            showarrow=False,
+            font=dict(color="#5A7499", size=9, family="Space Mono"),
+            xanchor="left"
+        )
+
+        lf = base_layout(f"7-Day Forecast — {stock_name}")
+        lf["height"] = 400
+        fig_fc.update_layout(**lf)
+        st.plotly_chart(fig_fc, use_container_width=True)
+
+        st.markdown(
+            '<div class="warn-box">⚠️ Multi-day forecasts compound prediction error. '
+            'Days 5-7 should be treated as directional trend only.</div>',
+            unsafe_allow_html=True
+        )
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 3 — BACKTEST
+# ════════════════════════════════════════════════════════════════════════════════
+with tab3:
+    if model is None:
+        st.error("Model not found. Please train first.")
+    else:
+        st.markdown('<div class="section-header">Backtest — Predicted vs Actual</div>', unsafe_allow_html=True)
+
+        # Month selector
+        bt_col1, bt_col2 = st.columns([2, 5])
+        with bt_col1:
+            month_options = {"1 Month": 1, "3 Months": 3, "6 Months": 6,
+                             "12 Months": 12, "24 Months": 24, "36 Months": 36}
+            bt_range = st.selectbox("Backtest Period", list(month_options.keys()),
+                                    index=2, label_visibility="visible")
+            bt_months = month_options[bt_range]
+
+        with st.spinner(f"Running backtest for {bt_range}..."):
+            bt_dates, bt_actuals, bt_preds = run_backtest(model, scaler, df, bt_months)
+
+        # Metrics
+        bt_actuals_arr = np.array(bt_actuals)
+        bt_preds_arr   = np.array(bt_preds)
+        mae   = float(np.mean(np.abs(bt_actuals_arr - bt_preds_arr)))
+        mape  = float(np.mean(np.abs((bt_actuals_arr - bt_preds_arr) / bt_actuals_arr)) * 100)
+        ss_res = np.sum((bt_actuals_arr - bt_preds_arr) ** 2)
+        ss_tot = np.sum((bt_actuals_arr - np.mean(bt_actuals_arr)) ** 2)
+        r2    = float(1 - ss_res / ss_tot)
+
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.markdown(f"""
+            <div class="stat-box">
+                <div class="stat-label">R² Score</div>
+                <div class="stat-value" style="color:#00F5A0">{r2:.4f}</div>
+            </div>""", unsafe_allow_html=True)
+        with m2:
+            st.markdown(f"""
+            <div class="stat-box">
+                <div class="stat-label">MAE</div>
+                <div class="stat-value">₹{mae:.2f}</div>
+            </div>""", unsafe_allow_html=True)
+        with m3:
+            st.markdown(f"""
+            <div class="stat-box">
+                <div class="stat-label">MAPE</div>
+                <div class="stat-value">{mape:.2f}%</div>
+            </div>""", unsafe_allow_html=True)
+        with m4:
+            days_tested = len(bt_dates)
+            st.markdown(f"""
+            <div class="stat-box">
+                <div class="stat-label">Days Tested</div>
+                <div class="stat-value">{days_tested}</div>
+            </div>""", unsafe_allow_html=True)
+
+        # Backtest chart
+        fig_bt = go.Figure()
+        fig_bt.add_trace(go.Scatter(
+            x=bt_dates, y=bt_actuals,
+            line=dict(color=BLUE, width=2),
+            name="Actual Price"
+        ))
+        fig_bt.add_trace(go.Scatter(
+            x=bt_dates, y=bt_preds,
+            line=dict(color=GREEN, width=1.5, dash="dot"),
+            name="Predicted Price",
+            opacity=0.9
+        ))
+
+        # Error fill
+        fig_bt.add_trace(go.Scatter(
+            x=bt_dates + bt_dates[::-1],
+            y=bt_preds + bt_actuals[::-1],
+            fill="toself",
+            fillcolor="rgba(0,245,160,0.04)",
+            line=dict(color="rgba(255,255,255,0)"),
+            showlegend=False,
+            name="Error Band"
+        ))
+
+        lb = base_layout(f"Backtest — {stock_name} ({bt_range})")
+        lb["height"] = 440
+        fig_bt.update_layout(**lb)
+        st.plotly_chart(fig_bt, use_container_width=True)
+
+        # Error distribution
+        st.markdown('<div class="section-header">Prediction Error Distribution</div>', unsafe_allow_html=True)
+        errors = bt_preds_arr - bt_actuals_arr
+        fig_err = go.Figure()
+        fig_err.add_trace(go.Histogram(
+            x=errors,
+            nbinsx=40,
+            marker_color=PURPLE,
+            opacity=0.8,
+            name="Prediction Error"
+        ))
+        fig_err.add_vline(x=0, line=dict(color=GREEN, width=1.5, dash="dash"))
+        le = base_layout("Prediction Error Distribution (₹)")
+        le["height"] = 220
+        le["margin"] = dict(l=12, r=12, t=30, b=12)
+        fig_err.update_layout(**le)
+        st.plotly_chart(fig_err, use_container_width=True)
 
 # ─── FOOTER ──────────────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
     '<div style="text-align:center;font-family:Space Mono;font-size:0.62rem;color:#1E2D4A;">'
-    'StockSense India · LSTM · TensorFlow · Data via yfinance'
+    'StockSense India · LSTM · TensorFlow · Data via yfinance · For educational use only'
     '</div>',
     unsafe_allow_html=True
 )
