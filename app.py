@@ -4,8 +4,8 @@ import pandas as pd
 import yfinance as yf
 import pickle
 import os
-import onnxruntime as ort
 from datetime import datetime, timedelta
+from keras.models import load_model
 import plotly.graph_objects as go
 
 # ─── PAGE CONFIG ────────────────────────────────────────────────────────────────
@@ -199,7 +199,6 @@ LOOKBACK = 60
 
 # ─── HELPERS ─────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
-@st.cache_data(ttl=300)
 def load_data(ticker):
     for attempt in range(3):
         try:
@@ -218,18 +217,14 @@ def load_data(ticker):
     return None
 
 @st.cache_resource
-def load_onnx_session(model_name):
-    onnx_path = os.path.join(SAVE_DIR, f"{model_name}.onnx")
-    if not os.path.exists(onnx_path):
-        return None
-    return ort.InferenceSession(onnx_path)
-
-@st.cache_resource
-def load_scaler(model_name):
+def load_model_and_scaler(model_name):
+    model_path  = os.path.join(SAVE_DIR, f"{model_name}_model.keras")
     scaler_path = os.path.join(SAVE_DIR, f"{model_name}_scaler.pkl")
-    if not os.path.exists(scaler_path):
-        return None
-    return pickle.load(open(scaler_path, "rb"))
+    if not os.path.exists(model_path) or not os.path.exists(scaler_path):
+        return None, None
+    model  = load_model(model_path)
+    scaler = pickle.load(open(scaler_path, "rb"))
+    return model, scaler
 
 def calc_rsi(source, length=14):
     change   = pd.Series(source).diff()
@@ -284,13 +279,11 @@ def next_trading_day(from_date):
         d += timedelta(days=1)
     return d
 
-def predict_tomorrow(session, scaler, df):
+def predict_tomorrow(model, scaler, df):
     close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
     scaled = scaler.transform(close)
-    seq    = scaled[-LOOKBACK:].reshape(1, LOOKBACK, 1).astype(np.float32)
-    input_name  = session.get_inputs()[0].name
-    output_name = session.get_outputs()[0].name
-    pred   = session.run([output_name], {input_name: seq})[0]
+    seq    = scaled[-LOOKBACK:].reshape(1, LOOKBACK, 1)
+    pred   = model.predict(seq, verbose=0)
     price  = scaler.inverse_transform(pred)[0][0]
     return float(price)
 
@@ -349,7 +342,7 @@ with col_title:
     st.markdown(
         f"## {stock_name} &nbsp;"
         f"<span style='font-size:0.8rem;color:#3A5070;font-family:Space Mono'>{ticker}</span>"
-        f"<span class='model-badge'>LSTM · ONNX</span>",
+        f"<span class='model-badge'>LSTM</span>",
         unsafe_allow_html=True
     )
 with col_refresh:
@@ -381,16 +374,15 @@ chg_symbol   = "▲" if day_change >= 0 else "▼"
 
 # ─── PREDICTION ──────────────────────────────────────────────────────────────────
 with st.spinner(f"Running LSTM prediction for {stock_name}..."):
-    session = load_onnx_session(model_name)
-    scaler  = load_scaler(model_name)
+    model, scaler = load_model_and_scaler(model_name)
 
 pred_price  = None
 pred_change = None
 pred_pct    = None
 pred_day    = None
 
-if session is not None and scaler is not None:
-    pred_price  = predict_tomorrow(session, scaler, df)
+if model is not None:
+    pred_price  = predict_tomorrow(model, scaler, df)
     pred_change = pred_price - latest_close
     pred_pct    = (pred_change / latest_close) * 100
     pred_day    = next_trading_day(datetime.today())
@@ -423,7 +415,7 @@ with c2:
         <div class="metric-card">
             <div class="metric-label">Tomorrow's Prediction</div>
             <div class="metric-value" style="font-size:1rem;color:#3A5070;">Model not found</div>
-            <div class="metric-sub neutral">ONNX file missing</div>
+            <div class="metric-sub neutral">Run training notebook first</div>
         </div>""", unsafe_allow_html=True)
 
 with c3:
@@ -558,7 +550,7 @@ st.plotly_chart(fig_vol, use_container_width=True)
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
     '<div style="text-align:center;font-family:Space Mono;font-size:0.62rem;color:#1E2D4A;">'
-    'StockSense India · LSTM · ONNX Runtime · Data via yfinance · For educational use only'
+    'StockSense India · LSTM · TensorFlow · Data via yfinance · For educational use only'
     '</div>',
     unsafe_allow_html=True
 )
