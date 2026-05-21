@@ -569,6 +569,12 @@ BLUE     = "#00D9F5"
 YELLOW   = "#F5C518"
 PURPLE   = "#B06DFF"
 
+CHART_CONFIG = {
+    "displaylogo": False,
+    "modeBarButtonsToRemove": ["autoScale2d", "lasso2d", "select2d"],
+    "toImageButtonOptions": {"format": "png", "filename": "StockSense_India"},
+}
+
 def base_layout(title=""):
     return dict(
         title=dict(text=title, font=dict(family="Syne", size=13, color="#E0E6F0")),
@@ -577,23 +583,41 @@ def base_layout(title=""):
         xaxis=dict(
             gridcolor=GRID_CLR, showgrid=True, zeroline=False,
             tickfont=dict(size=9), rangeslider=dict(visible=False),
+            showspikes=True, spikemode="across", spikedash="dot",
+            spikecolor="#3A5070", spikethickness=1,
             rangeselector=dict(
                 buttons=[
                     dict(count=1,  label="1M", step="month", stepmode="backward"),
                     dict(count=3,  label="3M", step="month", stepmode="backward"),
                     dict(count=6,  label="6M", step="month", stepmode="backward"),
                     dict(count=1,  label="1Y", step="year",  stepmode="backward"),
-                    dict(step="all", label="All")
+                    dict(count=2,  label="2Y", step="year",  stepmode="backward"),
+                    dict(step="all", label="MAX")
                 ],
-                bgcolor="#0D1525", activecolor="#1E2D4A",
-                font=dict(color="#5A7499", size=9, family="Space Mono"),
-                bordercolor="#1E2D4A", borderwidth=1, x=0, y=1.02
+                bgcolor="#0D1525", activecolor="#00F5A0",
+                font=dict(color="#E0E6F0", size=9, family="Space Mono"),
+                bordercolor="#1E2D4A", borderwidth=1, x=0, y=1.04
             )
         ),
-        yaxis=dict(gridcolor=GRID_CLR, showgrid=True, zeroline=False, tickfont=dict(size=9)),
+        yaxis=dict(
+            gridcolor=GRID_CLR, showgrid=True, zeroline=False,
+            tickfont=dict(size=9),
+            showspikes=True, spikemode="across", spikedash="dot",
+            spikecolor="#3A5070", spikethickness=1,
+        ),
         margin=dict(l=12, r=12, t=50, b=12),
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=9)),
         hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="#0D1525",
+            bordercolor="#1E2D4A",
+            font=dict(family="Space Mono", size=10, color="#E0E6F0")
+        ),
+        modebar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            color="#3A5070",
+            activecolor="#00F5A0",
+        ),
     )
 
 # ─── SIDEBAR ─────────────────────────────────────────────────────────────────────
@@ -778,97 +802,182 @@ with tab1:
                 unsafe_allow_html=True)
 
     fig_price = go.Figure()
+
+    # Candlestick — improved styling
     fig_price.add_trace(go.Candlestick(
         x=df_view["Date"],
         open=df_view["Open"], high=df_view["High"],
         low=df_view["Low"],   close=df_view["Close"],
-        increasing_line_color=GREEN, decreasing_line_color=RED,
-        increasing_fillcolor=GREEN,  decreasing_fillcolor=RED,
-        name="OHLC", opacity=0.85
+        increasing=dict(line=dict(color="#00F5A0", width=1.2), fillcolor="rgba(0,245,160,0.75)"),
+        decreasing=dict(line=dict(color="#FF4D6D", width=1.2), fillcolor="rgba(255,77,109,0.75)"),
+        whiskerwidth=0.3,
+        name="OHLC",
     ))
-    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["BB_Upper"],
-        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Upper"))
-    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["BB_Lower"],
-        fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
-        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Lower"))
-    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["BB_Mid"],
-        line=dict(color="rgba(0,217,245,0.5)", width=1), name="BB Mid"))
-    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["MA50"],
-        line=dict(color=YELLOW, width=1.5), name="MA 50"))
-    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["MA200"],
-        line=dict(color="#FF6B9D", width=1.5), name="MA 200"))
 
+    # Bollinger Bands
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["BB_Upper"],
+        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
+        name="BB Upper",
+        hovertemplate="BB Upper: ₹%{y:,.2f}<extra></extra>"
+    ))
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["BB_Lower"],
+        fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
+        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
+        name="BB Lower",
+        hovertemplate="BB Lower: ₹%{y:,.2f}<extra></extra>"
+    ))
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["BB_Mid"],
+        line=dict(color="rgba(0,217,245,0.5)", width=1),
+        name="BB Mid",
+        hovertemplate="BB Mid: ₹%{y:,.2f}<extra></extra>"
+    ))
+
+    # Moving Averages
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["MA50"],
+        line=dict(color=YELLOW, width=1.5),
+        name="MA 50",
+        hovertemplate="MA50: ₹%{y:,.2f}<extra></extra>"
+    ))
+    fig_price.add_trace(go.Scatter(
+        x=df_view["Date"], y=df_view["MA200"],
+        line=dict(color="#FF6B9D", width=1.5),
+        name="MA 200",
+        hovertemplate="MA200: ₹%{y:,.2f}<extra></extra>"
+    ))
+
+    # 52W lines
     if w52_high:
         fig_price.add_hline(y=w52_high, line=dict(color="rgba(0,245,160,0.3)", width=1, dash="dot"),
             annotation_text="52W High", annotation_font=dict(color="#00F5A0", size=9, family="Space Mono"))
     if w52_low:
         fig_price.add_hline(y=w52_low, line=dict(color="rgba(255,77,109,0.3)", width=1, dash="dot"),
             annotation_text="52W Low", annotation_font=dict(color="#FF4D6D", size=9, family="Space Mono"))
+
+    # LSTM prediction star
     if pred_price:
         fig_price.add_trace(go.Scatter(
             x=[pred_day], y=[pred_price], mode="markers+text",
             marker=dict(color=GREEN, size=12, symbol="star", line=dict(color="white", width=1.5)),
             text=[f"  ₹{pred_price:,.0f}"],
             textfont=dict(color=GREEN, size=10, family="Space Mono"),
-            textposition="middle right", name="LSTM Prediction"
+            textposition="middle right", name="LSTM Prediction",
+            hovertemplate="LSTM Pred: ₹%{y:,.2f}<extra></extra>"
         ))
 
     l = base_layout()
     l["height"] = 480
     fig_price.update_layout(**l)
-    st.plotly_chart(fig_price, use_container_width=True)
+    st.plotly_chart(fig_price, use_container_width=True, config=CHART_CONFIG)
 
     st.markdown('<div class="section-header">Indicators</div>', unsafe_allow_html=True)
     col_rsi, col_macd = st.columns(2)
 
     with col_rsi:
         fig_rsi = go.Figure()
-        fig_rsi.add_trace(go.Scatter(x=df_view["Date"], y=df_view["RSI"],
+
+        # Band fill between 30 and 70
+        fig_rsi.add_trace(go.Scatter(
+            x=df_view["Date"], y=[70]*len(df_view),
+            line=dict(color="rgba(255,77,109,0.4)", width=1, dash="dot"),
+            showlegend=False, hoverinfo="skip"
+        ))
+        fig_rsi.add_trace(go.Scatter(
+            x=df_view["Date"], y=[30]*len(df_view),
+            fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
+            line=dict(color="rgba(0,245,160,0.4)", width=1, dash="dot"),
+            showlegend=False, hoverinfo="skip"
+        ))
+
+        # RSI line
+        fig_rsi.add_trace(go.Scatter(
+            x=df_view["Date"], y=df_view["RSI"],
             line=dict(color=BLUE, width=1.8),
-            fill="tozeroy", fillcolor="rgba(0,217,245,0.05)", name="RSI"))
+            name="RSI(14)",
+            hovertemplate="RSI: %{y:.1f}<extra></extra>"
+        ))
+
         fig_rsi.add_hrect(y0=70, y1=100, fillcolor="rgba(255,77,109,0.05)", line_width=0,
             annotation_text="Overbought", annotation_font=dict(color="#FF4D6D", size=8, family="Space Mono"))
         fig_rsi.add_hrect(y0=0, y1=30, fillcolor="rgba(0,245,160,0.05)", line_width=0,
             annotation_text="Oversold", annotation_font=dict(color="#00F5A0", size=8, family="Space Mono"))
-        fig_rsi.add_hline(y=70, line=dict(color=RED,      width=1, dash="dot"))
-        fig_rsi.add_hline(y=30, line=dict(color=GREEN,    width=1, dash="dot"))
         fig_rsi.add_hline(y=50, line=dict(color=GRID_CLR, width=1, dash="dot"))
+
         l2 = base_layout("RSI (14)")
         l2["height"] = 220
         l2["yaxis"]["range"] = [0, 100]
         l2["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_rsi.update_layout(**l2)
-        st.plotly_chart(fig_rsi, use_container_width=True)
+        st.plotly_chart(fig_rsi, use_container_width=True, config=CHART_CONFIG)
 
     with col_macd:
         fig_macd = go.Figure()
-        colors_hist = [GREEN if v >= 0 else RED for v in df_view["Hist"].fillna(0)]
-        fig_macd.add_trace(go.Bar(x=df_view["Date"], y=df_view["Hist"],
-            marker_color=colors_hist, name="Histogram", opacity=0.7))
-        fig_macd.add_trace(go.Scatter(x=df_view["Date"], y=df_view["MACD"],
-            line=dict(color=BLUE, width=1.5), name="MACD"))
-        fig_macd.add_trace(go.Scatter(x=df_view["Date"], y=df_view["Signal"],
-            line=dict(color=YELLOW, width=1.5), name="Signal"))
+
+        # MACD histogram with opacity gradient
+        hist_vals = df_view["Hist"].fillna(0)
+        max_hist = hist_vals.abs().max()
+        if max_hist == 0:
+            max_hist = 1
+        hist_colors = [
+            f"rgba(0,245,160,{min(0.9, 0.3 + abs(v)/max_hist*0.7)})" if v >= 0
+            else f"rgba(255,77,109,{min(0.9, 0.3 + abs(v)/max_hist*0.7)})"
+            for v in hist_vals
+        ]
+
+        fig_macd.add_trace(go.Bar(
+            x=df_view["Date"], y=hist_vals,
+            marker_color=hist_colors, name="Histogram",
+            hovertemplate="Hist: %{y:.4f}<extra></extra>"
+        ))
+        fig_macd.add_trace(go.Scatter(
+            x=df_view["Date"], y=df_view["MACD"],
+            line=dict(color=BLUE, width=1.5), name="MACD",
+            hovertemplate="MACD: %{y:.4f}<extra></extra>"
+        ))
+        fig_macd.add_trace(go.Scatter(
+            x=df_view["Date"], y=df_view["Signal"],
+            line=dict(color=YELLOW, width=1.5), name="Signal",
+            hovertemplate="Signal: %{y:.4f}<extra></extra>"
+        ))
         l3 = base_layout("MACD (12, 26, 9)")
         l3["height"] = 220
         l3["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_macd.update_layout(**l3)
-        st.plotly_chart(fig_macd, use_container_width=True)
+        st.plotly_chart(fig_macd, use_container_width=True, config=CHART_CONFIG)
 
     st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
     vol_colors = [GREEN if df_view["Close"].iloc[i] >= df_view["Open"].iloc[i]
                   else RED for i in range(len(df_view))]
     fig_vol = go.Figure()
-    fig_vol.add_trace(go.Bar(x=df_view["Date"], y=df_view["Volume"],
-        marker_color=vol_colors, opacity=0.7, name="Volume"))
+    fig_vol.add_trace(go.Bar(
+        x=df_view["Date"], y=df_view["Volume"],
+        marker_color=vol_colors, opacity=0.7, name="Volume",
+        hovertemplate="Vol: %{y:,.0f}<extra></extra>"
+    ))
     vol_ma = df_view["Volume"].rolling(20).mean()
-    fig_vol.add_trace(go.Scatter(x=df_view["Date"], y=vol_ma,
-        line=dict(color=YELLOW, width=1.5), name="Vol MA 20"))
+    fig_vol.add_trace(go.Scatter(
+        x=df_view["Date"], y=vol_ma,
+        line=dict(color=YELLOW, width=1.5), name="Vol MA 20",
+        hovertemplate="Vol MA20: %{y:,.0f}<extra></extra>"
+    ))
+    # Vol MA annotation
+    if not vol_ma.dropna().empty:
+        fig_vol.add_annotation(
+            x=df_view["Date"].iloc[-1],
+            y=float(vol_ma.iloc[-1]),
+            text="  Vol MA20",
+            showarrow=False,
+            font=dict(color=YELLOW, size=8, family="Space Mono"),
+            xanchor="left"
+        )
     l4 = base_layout("Volume")
     l4["height"] = 180
     l4["margin"] = dict(l=12, r=12, t=40, b=12)
     fig_vol.update_layout(**l4)
-    st.plotly_chart(fig_vol, use_container_width=True)
+    st.plotly_chart(fig_vol, use_container_width=True, config=CHART_CONFIG)
 
     # Stock Details
     st.markdown('<div class="section-header">Stock Details</div>', unsafe_allow_html=True)
@@ -933,11 +1042,17 @@ with tab2:
         st.markdown("<br>", unsafe_allow_html=True)
         fig_fc = go.Figure()
         last60 = df.tail(60)
-        fig_fc.add_trace(go.Scatter(x=last60["Date"], y=last60["Close"],
-            line=dict(color=BLUE, width=2), name="Actual Price"))
+        fig_fc.add_trace(go.Scatter(
+            x=last60["Date"], y=last60["Close"],
+            line=dict(color=BLUE, width=2), name="Actual Price",
+            hovertemplate="Close: ₹%{y:,.2f}<extra></extra>"
+        ))
 
-        upper_band = [p * (1 + 0.01*(i+1)) for i, p in enumerate(forecast_prices)]
-        lower_band = [p * (1 - 0.01*(i+1)) for i, p in enumerate(forecast_prices)]
+        # Volatility-based confidence band (realistic uncertainty cone)
+        returns_std = float(df["Close"].pct_change().tail(60).std())
+        upper_band = [p * (1 + returns_std * np.sqrt(i+1)) for i, p in enumerate(forecast_prices)]
+        lower_band = [p * (1 - returns_std * np.sqrt(i+1)) for i, p in enumerate(forecast_prices)]
+
         fig_fc.add_trace(go.Scatter(
             x=forecast_days + forecast_days[::-1],
             y=upper_band + lower_band[::-1],
@@ -951,7 +1066,9 @@ with tab2:
             line=dict(color=GREEN, width=2.5, dash="dot"),
             mode="lines+markers",
             marker=dict(color=GREEN, size=7, symbol="circle"),
-            name="7-Day Forecast"))
+            name="7-Day Forecast",
+            hovertemplate="Forecast: ₹%{y:,.2f}<extra></extra>"
+        ))
         fig_fc.add_vline(x=df["Date"].iloc[-1], line=dict(color="#5A7499", width=1, dash="dash"))
         fig_fc.add_annotation(x=df["Date"].iloc[-1], y=latest_close, text="  Today",
             showarrow=False, font=dict(color="#5A7499", size=9, family="Space Mono"), xanchor="left")
@@ -959,7 +1076,7 @@ with tab2:
         lf = base_layout(f"7-Day Forecast — {stock_name}")
         lf["height"] = 420
         fig_fc.update_layout(**lf)
-        st.plotly_chart(fig_fc, use_container_width=True)
+        st.plotly_chart(fig_fc, use_container_width=True, config=CHART_CONFIG)
         st.markdown('<div class="warn-box">⚠️ Multi-day forecasts compound prediction error. Days 5–7 should be treated as directional trend only.</div>',
                     unsafe_allow_html=True)
 
@@ -1013,26 +1130,39 @@ with tab3:
             <div class="stat-value" style="color:#00F5A0">{dir_acc:.1f}%</div></div>""", unsafe_allow_html=True)
 
         fig_bt = go.Figure()
-        fig_bt.add_trace(go.Scatter(x=bt_dates, y=bt_actuals, line=dict(color=BLUE, width=2), name="Actual Price"))
-        fig_bt.add_trace(go.Scatter(x=bt_dates, y=bt_preds, line=dict(color=GREEN, width=1.5, dash="dot"), name="Predicted Price", opacity=0.9))
-        fig_bt.add_trace(go.Scatter(x=bt_dates+bt_dates[::-1], y=bt_preds+bt_actuals[::-1],
+        fig_bt.add_trace(go.Scatter(
+            x=bt_dates, y=bt_actuals,
+            line=dict(color=BLUE, width=2), name="Actual Price",
+            hovertemplate="Actual: ₹%{y:,.2f}<extra></extra>"
+        ))
+        fig_bt.add_trace(go.Scatter(
+            x=bt_dates, y=bt_preds,
+            line=dict(color=GREEN, width=1.5, dash="dot"), name="Predicted Price", opacity=0.9,
+            hovertemplate="Predicted: ₹%{y:,.2f}<extra></extra>"
+        ))
+        fig_bt.add_trace(go.Scatter(
+            x=bt_dates+bt_dates[::-1], y=bt_preds+bt_actuals[::-1],
             fill="toself", fillcolor="rgba(0,245,160,0.04)",
-            line=dict(color="rgba(255,255,255,0)"), showlegend=False))
+            line=dict(color="rgba(255,255,255,0)"), showlegend=False
+        ))
         lb = base_layout(f"Backtest — {stock_name} ({bt_range})")
         lb["height"] = 440
         fig_bt.update_layout(**lb)
-        st.plotly_chart(fig_bt, use_container_width=True)
+        st.plotly_chart(fig_bt, use_container_width=True, config=CHART_CONFIG)
 
         st.markdown('<div class="section-header">Prediction Error Distribution</div>', unsafe_allow_html=True)
         errors = bt_p - bt_a
         fig_err = go.Figure()
-        fig_err.add_trace(go.Histogram(x=errors, nbinsx=40, marker_color=PURPLE, opacity=0.8, name="Error"))
+        fig_err.add_trace(go.Histogram(
+            x=errors, nbinsx=40, marker_color=PURPLE, opacity=0.8, name="Error",
+            hovertemplate="Error: ₹%{x:,.2f} · Count: %{y}<extra></extra>"
+        ))
         fig_err.add_vline(x=0, line=dict(color=GREEN, width=1.5, dash="dash"))
         le = base_layout("Prediction Error Distribution (₹)")
         le["height"] = 220
         le["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_err.update_layout(**le)
-        st.plotly_chart(fig_err, use_container_width=True)
+        st.plotly_chart(fig_err, use_container_width=True, config=CHART_CONFIG)
 
         st.markdown(f"""
         <div class="warn-box" style="border-color:rgba(0,245,160,0.2);background:rgba(0,245,160,0.03);color:#5A7499;">
