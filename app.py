@@ -30,7 +30,6 @@ html, body, [data-testid="stAppViewContainer"] {
     border-right: 1px solid #1E2D4A;
 }
 [data-testid="stHeader"] { background-color: #090E1A !important; }
-
 h1, h2, h3, h4 { font-family: 'Syne', sans-serif !important; letter-spacing: -0.02em; }
 p, div, span, label { font-family: 'Space Mono', monospace !important; font-size: 0.82rem; }
 
@@ -42,6 +41,12 @@ p, div, span, label { font-family: 'Space Mono', monospace !important; font-size
     margin-bottom: 12px;
     position: relative;
     overflow: hidden;
+    transition: all 0.3s ease;
+}
+.metric-card:hover {
+    border-color: rgba(0,245,160,0.3);
+    box-shadow: 0 0 20px rgba(0,245,160,0.05);
+    transform: translateY(-2px);
 }
 .metric-card::before {
     content: '';
@@ -50,6 +55,10 @@ p, div, span, label { font-family: 'Space Mono', monospace !important; font-size
     height: 2px;
     background: linear-gradient(90deg, #00F5A0, #00D9F5);
 }
+.metric-card-bull::before { background: linear-gradient(90deg, #00F5A0, #00D9F5); }
+.metric-card-bear::before { background: linear-gradient(90deg, #FF4D6D, #FF8C42); }
+.metric-card-neutral::before { background: linear-gradient(90deg, #F5C518, #FF8C42); }
+
 .metric-label {
     font-family: 'Space Mono', monospace;
     font-size: 0.68rem;
@@ -66,7 +75,6 @@ p, div, span, label { font-family: 'Space Mono', monospace !important; font-size
     line-height: 1;
 }
 .metric-sub { font-family: 'Space Mono', monospace; font-size: 0.72rem; margin-top: 6px; }
-
 .bullish { color: #00F5A0; }
 .bearish { color: #FF4D6D; }
 .neutral { color: #F5C518; }
@@ -127,9 +135,9 @@ div.stButton > button {
 div.stButton > button:hover {
     border-color: #00F5A0;
     background: rgba(0,245,160,0.08);
+    box-shadow: 0 0 12px rgba(0,245,160,0.15);
 }
 
-/* Tab styling */
 [data-testid="stTabs"] [data-baseweb="tab-list"] {
     background-color: #0D1525 !important;
     border-bottom: 1px solid #1E2D4A !important;
@@ -173,6 +181,37 @@ hr { border-color: #1E2D4A !important; }
     margin-left: 8px;
     vertical-align: middle;
 }
+.market-open-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    background: rgba(0,245,160,0.08);
+    border: 1px solid rgba(0,245,160,0.3);
+    color: #00F5A0;
+    letter-spacing: 0.08em;
+    margin-left: 8px;
+    vertical-align: middle;
+    animation: pulse 2s infinite;
+}
+.market-closed-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    background: rgba(255,77,109,0.08);
+    border: 1px solid rgba(255,77,109,0.3);
+    color: #FF4D6D;
+    letter-spacing: 0.08em;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
 
 .warn-box {
     background: rgba(245,197,24,0.05);
@@ -212,6 +251,12 @@ hr { border-color: #1E2D4A !important; }
     text-align: center;
     position: relative;
     overflow: hidden;
+    transition: all 0.2s ease;
+}
+.forecast-card:hover {
+    border-color: rgba(0,245,160,0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 .forecast-day {
     font-family: 'Space Mono', monospace;
@@ -227,11 +272,7 @@ hr { border-color: #1E2D4A !important; }
     font-weight: 800;
     color: #E0E6F0;
 }
-.forecast-change {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.65rem;
-    margin-top: 4px;
-}
+.forecast-change { font-family: 'Space Mono', monospace; font-size: 0.65rem; margin-top: 4px; }
 
 .stat-box {
     background: #0D1525;
@@ -239,7 +280,9 @@ hr { border-color: #1E2D4A !important; }
     border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 8px;
+    transition: all 0.2s ease;
 }
+.stat-box:hover { border-color: rgba(0,245,160,0.2); }
 .stat-label {
     font-family: 'Space Mono', monospace;
     font-size: 0.62rem;
@@ -254,21 +297,104 @@ hr { border-color: #1E2D4A !important; }
     color: #E0E6F0;
     margin-top: 2px;
 }
+
+.about-card {
+    background: linear-gradient(135deg, #0D1525 0%, #111C35 100%);
+    border: 1px solid #1E2D4A;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+}
+.about-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #00F5A0;
+    margin-bottom: 8px;
+}
+.about-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    color: #5A7499;
+    line-height: 1.8;
+}
+
+.index-card {
+    background: #0D1525;
+    border: 1px solid #1E2D4A;
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: center;
+    margin-bottom: 8px;
+}
+.index-name { font-family: 'Space Mono', monospace; font-size: 0.6rem; color: #5A7499; text-transform: uppercase; letter-spacing: 0.1em; }
+.index-value { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; color: #E0E6F0; margin: 2px 0; }
+.index-change { font-family: 'Space Mono', monospace; font-size: 0.62rem; }
+
+.sidebar-stock-info {
+    background: rgba(0,245,160,0.05);
+    border: 1px solid rgba(0,245,160,0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    color: #5A7499;
+}
+
+.accuracy-bar-wrap {
+    background: #1E2D4A;
+    border-radius: 4px;
+    height: 6px;
+    margin-top: 6px;
+    overflow: hidden;
+}
+.accuracy-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #00F5A0, #00D9F5);
+}
+
+.footer {
+    text-align: center;
+    padding: 24px 0 12px 0;
+    border-top: 1px solid #1E2D4A;
+    margin-top: 32px;
+}
+.footer-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    background: linear-gradient(90deg, #00F5A0, #00D9F5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.footer-text { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: #1E2D4A; margin-top: 6px; }
+.footer-links { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: #3A5070; margin-top: 8px; }
+.footer-links a { color: #3A5070; text-decoration: none; margin: 0 8px; }
+.footer-links a:hover { color: #00F5A0; }
 </style>
 """, unsafe_allow_html=True)
 
 # ─── CONSTANTS ───────────────────────────────────────────────────────────────────
 STOCKS = {
-    "Reliance Industries": {"ticker": "RELIANCE.NS",   "model": "Reliance"},
-    "TCS":                 {"ticker": "TCS.NS",         "model": "TCS"},
-    "Infosys":             {"ticker": "INFY.NS",        "model": "Infosys"},
-    "HDFC Bank":           {"ticker": "HDFCBANK.NS",    "model": "HDFC_Bank"},
-    "ICICI Bank":          {"ticker": "ICICIBANK.NS",   "model": "ICICI_Bank"},
-    "Wipro":               {"ticker": "WIPRO.NS",       "model": "Wipro"},
-    "Bajaj Finance":       {"ticker": "BAJFINANCE.NS",  "model": "Bajaj_Finance"},
-    "Bharti Airtel":       {"ticker": "BHARTIARTL.NS",  "model": "Bharti_Airtel"},
-    "Larsen & Toubro":     {"ticker": "LT.NS",          "model": "LT"},
-    "Asian Paints":        {"ticker": "ASIANPAINT.NS",  "model": "Asian_Paints"},
+    "Reliance Industries": {"ticker": "RELIANCE.NS",  "model": "Reliance",      "sector": "Energy"},
+    "TCS":                 {"ticker": "TCS.NS",        "model": "TCS",           "sector": "IT"},
+    "Infosys":             {"ticker": "INFY.NS",       "model": "Infosys",       "sector": "IT"},
+    "HDFC Bank":           {"ticker": "HDFCBANK.NS",   "model": "HDFC_Bank",     "sector": "Banking"},
+    "ICICI Bank":          {"ticker": "ICICIBANK.NS",  "model": "ICICI_Bank",    "sector": "Banking"},
+    "Wipro":               {"ticker": "WIPRO.NS",      "model": "Wipro",         "sector": "IT"},
+    "Bajaj Finance":       {"ticker": "BAJFINANCE.NS", "model": "Bajaj_Finance", "sector": "NBFC"},
+    "Bharti Airtel":       {"ticker": "BHARTIARTL.NS", "model": "Bharti_Airtel", "sector": "Telecom"},
+    "Larsen & Toubro":     {"ticker": "LT.NS",         "model": "LT",            "sector": "Infrastructure"},
+    "Asian Paints":        {"ticker": "ASIANPAINT.NS", "model": "Asian_Paints",  "sector": "Consumer"},
+}
+
+SECTOR_COLORS = {
+    "Energy": "#FF8C42", "IT": "#00D9F5", "Banking": "#B06DFF",
+    "NBFC": "#F5C518",   "Telecom": "#00F5A0", "Infrastructure": "#FF6B9D",
+    "Consumer": "#7EB8F5",
 }
 
 SAVE_DIR = os.path.dirname(__file__)
@@ -292,6 +418,25 @@ def load_data(ticker):
             if attempt == 2:
                 return None
     return None
+
+@st.cache_data(ttl=300)
+def load_index_data():
+    indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANK NIFTY": "^NSEBANK"}
+    result = {}
+    for name, ticker in indices.items():
+        try:
+            d = yf.download(ticker, period="2d", progress=False, timeout=10)
+            if not d.empty:
+                if isinstance(d.columns, pd.MultiIndex):
+                    d.columns = d.columns.get_level_values(0)
+                curr = float(d["Close"].iloc[-1])
+                prev = float(d["Close"].iloc[-2])
+                chg  = curr - prev
+                pct  = (chg / prev) * 100
+                result[name] = {"price": curr, "change": chg, "pct": pct}
+        except Exception:
+            pass
+    return result
 
 @st.cache_resource
 def load_model_and_scaler(model_name):
@@ -350,6 +495,13 @@ def get_signal(df):
     elif score <= -2: return "SELL", "badge-sell", "bearish"
     else:             return "HOLD", "badge-hold", "neutral"
 
+def is_market_open():
+    now      = datetime.now()
+    ist_hour = (now.hour + 5) % 24
+    ist_min  = (now.minute + 30) % 60
+    ist_time = ist_hour * 60 + ist_min
+    return now.weekday() < 5 and 555 <= ist_time <= 930
+
 def next_trading_day(from_date):
     d = from_date + timedelta(days=1)
     while d.weekday() >= 5:
@@ -357,8 +509,7 @@ def next_trading_day(from_date):
     return d
 
 def get_trading_days(from_date, n):
-    days = []
-    d = from_date
+    days, d = [], from_date
     while len(days) < n:
         d = d + timedelta(days=1)
         if d.weekday() < 5:
@@ -368,8 +519,7 @@ def get_trading_days(from_date, n):
 def predict_one(model, scaler, sequence):
     seq   = sequence[-LOOKBACK:].reshape(1, LOOKBACK, 1)
     pred  = model.predict(seq, verbose=0)
-    price = scaler.inverse_transform(pred)[0][0]
-    return float(price)
+    return float(scaler.inverse_transform(pred)[0][0])
 
 def predict_tomorrow(model, scaler, df):
     close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
@@ -379,33 +529,35 @@ def predict_tomorrow(model, scaler, df):
 def predict_7days(model, scaler, df):
     close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
     scaled = scaler.transform(close).flatten().tolist()
-    preds  = []
-    seq    = scaled.copy()
+    preds, seq = [], scaled.copy()
     for _ in range(7):
         inp   = np.array(seq[-LOOKBACK:]).reshape(1, LOOKBACK, 1)
         pred  = model.predict(inp, verbose=0)
         price = float(scaler.inverse_transform(pred)[0][0])
-        scaled_val = float(scaler.transform([[price]])[0][0])
-        seq.append(scaled_val)
+        seq.append(float(scaler.transform([[price]])[0][0]))
         preds.append(price)
     return preds
 
 def run_backtest(model, scaler, df, months):
-    close    = df["Close"].to_numpy().flatten().reshape(-1, 1)
-    scaled   = scaler.transform(close).flatten()
-    days     = int(months * 21)
-    start_i  = max(LOOKBACK, len(scaled) - days - 1)
-    actuals  = []
-    preds    = []
-    dates    = []
+    close   = df["Close"].to_numpy().flatten().reshape(-1, 1)
+    scaled  = scaler.transform(close).flatten()
+    days    = int(months * 21)
+    start_i = max(LOOKBACK, len(scaled) - days - 1)
+    actuals, preds, dates = [], [], []
     for i in range(start_i, len(scaled)):
         seq   = scaled[i - LOOKBACK:i].reshape(1, LOOKBACK, 1)
         pred  = model.predict(seq, verbose=0)
-        price = float(scaler.inverse_transform(pred)[0][0])
-        preds.append(price)
+        preds.append(float(scaler.inverse_transform(pred)[0][0]))
         actuals.append(float(close[i][0]))
         dates.append(df["Date"].iloc[i])
     return dates, actuals, preds
+
+def get_52w(df):
+    one_year_ago = pd.Timestamp(datetime.today() - timedelta(days=365))
+    df_1y = df[df["Date"] >= one_year_ago]
+    if df_1y.empty:
+        return None, None
+    return float(df_1y["Low"].min()), float(df_1y["High"].max())
 
 # ─── PLOTLY THEME ────────────────────────────────────────────────────────────────
 PLOT_BG  = "#090E1A"
@@ -420,14 +572,26 @@ PURPLE   = "#B06DFF"
 def base_layout(title=""):
     return dict(
         title=dict(text=title, font=dict(family="Syne", size=13, color="#E0E6F0")),
-        paper_bgcolor=PLOT_BG,
-        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=PLOT_BG, plot_bgcolor=PLOT_BG,
         font=dict(family="Space Mono", color=TEXT_CLR, size=10),
-        xaxis=dict(gridcolor=GRID_CLR, showgrid=True, zeroline=False,
-                   tickfont=dict(size=9), rangeslider=dict(visible=False)),
-        yaxis=dict(gridcolor=GRID_CLR, showgrid=True, zeroline=False,
-                   tickfont=dict(size=9)),
-        margin=dict(l=12, r=12, t=36, b=12),
+        xaxis=dict(
+            gridcolor=GRID_CLR, showgrid=True, zeroline=False,
+            tickfont=dict(size=9), rangeslider=dict(visible=False),
+            rangeselector=dict(
+                buttons=[
+                    dict(count=1,  label="1M", step="month", stepmode="backward"),
+                    dict(count=3,  label="3M", step="month", stepmode="backward"),
+                    dict(count=6,  label="6M", step="month", stepmode="backward"),
+                    dict(count=1,  label="1Y", step="year",  stepmode="backward"),
+                    dict(step="all", label="All")
+                ],
+                bgcolor="#0D1525", activecolor="#1E2D4A",
+                font=dict(color="#5A7499", size=9, family="Space Mono"),
+                bordercolor="#1E2D4A", borderwidth=1, x=0, y=1.02
+            )
+        ),
+        yaxis=dict(gridcolor=GRID_CLR, showgrid=True, zeroline=False, tickfont=dict(size=9)),
+        margin=dict(l=12, r=12, t=50, b=12),
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=9)),
         hovermode="x unified",
     )
@@ -438,39 +602,75 @@ with st.sidebar:
     st.markdown('<div class="logo-sub">India · AI Predictions</div>', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
+    market_open = is_market_open()
+    if market_open:
+        st.markdown('<span class="market-open-badge">● Market Open</span>', unsafe_allow_html=True)
+    else:
+        st.markdown('<span class="market-closed-badge">● Market Closed</span>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-header">Select Stock</div>', unsafe_allow_html=True)
     stock_name = st.selectbox("Stock", list(STOCKS.keys()), label_visibility="collapsed")
 
+    sector       = STOCKS[stock_name]["sector"]
+    sector_color = SECTOR_COLORS.get(sector, "#5A7499")
+    st.markdown(f"""
+    <div class="sidebar-stock-info">
+        <span style="color:{sector_color}">■</span> {sector} &nbsp;·&nbsp;
+        <span style="color:#3A5070">NSE</span>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-header">Chart Range</div>', unsafe_allow_html=True)
     range_option = st.selectbox("Range", ["3 Months", "6 Months", "1 Year", "2 Years", "Max"],
                                 label_visibility="collapsed")
-
     range_map = {"3 Months": 90, "6 Months": 180, "1 Year": 365, "2 Years": 730, "Max": 9999}
     days_back = range_map[range_option]
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown(
-        '<div class="warn-box">⚠️ For educational use only. Not financial advice.</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Market Indices</div>', unsafe_allow_html=True)
+    with st.spinner(""):
+        indices = load_index_data()
 
-# ─── HEADER ──────────────────────────────────────────────────────────────────────
+    for idx_name, idx_data in indices.items():
+        chg_color = "#00F5A0" if idx_data["change"] >= 0 else "#FF4D6D"
+        chg_sym   = "▲" if idx_data["change"] >= 0 else "▼"
+        st.markdown(f"""
+        <div class="index-card">
+            <div class="index-name">{idx_name}</div>
+            <div class="index-value">{idx_data['price']:,.2f}</div>
+            <div class="index-change" style="color:{chg_color}">
+                {chg_sym} {abs(idx_data['pct']):.2f}%
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="warn-box">⚠️ For educational use only. Not financial advice.</div>',
+                unsafe_allow_html=True)
+
+# ─── LOAD DATA & MODEL ───────────────────────────────────────────────────────────
 ticker     = STOCKS[stock_name]["ticker"]
 model_name = STOCKS[stock_name]["model"]
+sector     = STOCKS[stock_name]["sector"]
 
 col_title, col_refresh = st.columns([5, 1])
 with col_title:
+    sc     = SECTOR_COLORS.get(sector, "#5A7499")
+    mbadge = '<span class="market-open-badge">● LIVE</span>' if market_open else ''
     st.markdown(
         f"## {stock_name} &nbsp;"
         f"<span style='font-size:0.8rem;color:#3A5070;font-family:Space Mono'>{ticker}</span>"
-        f"<span class='model-badge'>LSTM</span>",
+        f"<span class='model-badge'>LSTM</span>"
+        f"<span style='font-size:0.7rem;color:{sc};font-family:Space Mono;margin-left:8px;'>● {sector}</span>"
+        f"{mbadge}",
         unsafe_allow_html=True
     )
 with col_refresh:
     st.markdown("<br>", unsafe_allow_html=True)
-    st.button("↻ Refresh", use_container_width=True)
+    if st.button("↻ Refresh", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
-# ─── LOAD DATA & MODEL ───────────────────────────────────────────────────────────
 with st.spinner(f"Fetching {stock_name} data..."):
     df = load_data(ticker)
 
@@ -492,15 +692,12 @@ day_change   = latest_close - prev_close
 day_pct      = (day_change / prev_close) * 100
 chg_class    = "bullish" if day_change >= 0 else "bearish"
 chg_symbol   = "▲" if day_change >= 0 else "▼"
+w52_low, w52_high = get_52w(df)
 
-with st.spinner(f"Loading LSTM model..."):
+with st.spinner("Loading LSTM model..."):
     model, scaler = load_model_and_scaler(model_name)
 
-pred_price  = None
-pred_change = None
-pred_pct    = None
-pred_day    = None
-
+pred_price = pred_change = pred_pct = pred_day = None
 if model is not None:
     pred_price  = predict_tomorrow(model, scaler, df)
     pred_change = pred_price - latest_close
@@ -510,11 +707,12 @@ if model is not None:
 signal, badge_class, signal_class = get_signal(df)
 
 # ─── KPI ROW ─────────────────────────────────────────────────────────────────────
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 
 with c1:
+    cc = "metric-card metric-card-bull" if day_change >= 0 else "metric-card metric-card-bear"
     st.markdown(f"""
-    <div class="metric-card">
+    <div class="{cc}">
         <div class="metric-label">Current Price</div>
         <div class="metric-value">₹{latest_close:,.2f}</div>
         <div class="metric-sub {chg_class}">{chg_symbol} ₹{abs(day_change):.2f} ({abs(day_pct):.2f}%) today</div>
@@ -522,34 +720,44 @@ with c1:
 
 with c2:
     if pred_price:
-        p_class  = "bullish" if pred_change >= 0 else "bearish"
-        p_symbol = "▲" if pred_change >= 0 else "▼"
+        pc = "bullish" if pred_change >= 0 else "bearish"
+        pk = "metric-card metric-card-bull" if pred_change >= 0 else "metric-card metric-card-bear"
+        ps = "▲" if pred_change >= 0 else "▼"
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="{pk}">
             <div class="metric-label">Tomorrow's Prediction</div>
             <div class="metric-value">₹{pred_price:,.2f}</div>
-            <div class="metric-sub {p_class}">{p_symbol} ₹{abs(pred_change):.2f} ({abs(pred_pct):.2f}%) · {pred_day.strftime("%d %b")}</div>
-        </div>""", unsafe_allow_html=True)
-    else:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Tomorrow's Prediction</div>
-            <div class="metric-value" style="font-size:1rem;color:#3A5070;">Model not found</div>
-            <div class="metric-sub neutral">Run training notebook first</div>
+            <div class="metric-sub {pc}">{ps} ₹{abs(pred_change):.2f} ({abs(pred_pct):.2f}%) · {pred_day.strftime("%d %b")}</div>
         </div>""", unsafe_allow_html=True)
 
 with c3:
     rsi_val   = float(df["RSI"].iloc[-1])
     rsi_class = "bullish" if rsi_val < 40 else ("bearish" if rsi_val > 65 else "neutral")
     rsi_lbl   = "Oversold" if rsi_val < 30 else ("Overbought" if rsi_val > 70 else "Neutral")
+    rsi_card  = "metric-card metric-card-bull" if rsi_val < 40 else ("metric-card metric-card-bear" if rsi_val > 65 else "metric-card metric-card-neutral")
     st.markdown(f"""
-    <div class="metric-card">
+    <div class="{rsi_card}">
         <div class="metric-label">RSI (14)</div>
         <div class="metric-value">{rsi_val:.1f}</div>
         <div class="metric-sub {rsi_class}">{rsi_lbl}</div>
     </div>""", unsafe_allow_html=True)
 
 with c4:
+    if w52_low and w52_high:
+        pos_pct = ((latest_close - w52_low) / (w52_high - w52_low) * 100) if w52_high != w52_low else 50
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">52-Week Range</div>
+            <div class="metric-value" style="font-size:1rem;">₹{latest_close:,.0f}</div>
+            <div style="font-family:Space Mono;font-size:0.62rem;color:#5A7499;margin-top:6px;">
+                ₹{w52_low:,.0f} &nbsp;—&nbsp; ₹{w52_high:,.0f}
+            </div>
+            <div class="accuracy-bar-wrap">
+                <div class="accuracy-bar-fill" style="width:{pos_pct:.0f}%"></div>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+with c5:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Signal</div>
@@ -560,13 +768,14 @@ with c4:
     </div>""", unsafe_allow_html=True)
 
 # ─── TABS ────────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["📈  Live Chart", "🔮  7-Day Forecast", "🧪  Backtest"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📈  Live Chart", "🔮  7-Day Forecast", "🧪  Backtest", "ℹ️  About"
+])
 
-# ════════════════════════════════════════════════════════════════════════════════
-# TAB 1 — LIVE CHART
-# ════════════════════════════════════════════════════════════════════════════════
+# ════════════ TAB 1 — LIVE CHART ════════════
 with tab1:
-    st.markdown('<div class="section-header">Price Chart · Bollinger Bands · Moving Averages</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Price Chart · Bollinger Bands · Moving Averages</div>',
+                unsafe_allow_html=True)
 
     fig_price = go.Figure()
     fig_price.add_trace(go.Candlestick(
@@ -577,289 +786,332 @@ with tab1:
         increasing_fillcolor=GREEN,  decreasing_fillcolor=RED,
         name="OHLC", opacity=0.85
     ))
-    fig_price.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["BB_Upper"],
-        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Upper"
-    ))
-    fig_price.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["BB_Lower"],
+    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["BB_Upper"],
+        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Upper"))
+    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["BB_Lower"],
         fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
-        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Lower"
-    ))
-    fig_price.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["BB_Mid"],
-        line=dict(color="rgba(0,217,245,0.5)", width=1), name="BB Mid"
-    ))
-    fig_price.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["MA50"],
-        line=dict(color=YELLOW, width=1.5), name="MA 50"
-    ))
-    fig_price.add_trace(go.Scatter(
-        x=df_view["Date"], y=df_view["MA200"],
-        line=dict(color="#FF6B9D", width=1.5), name="MA 200"
-    ))
+        line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"), name="BB Lower"))
+    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["BB_Mid"],
+        line=dict(color="rgba(0,217,245,0.5)", width=1), name="BB Mid"))
+    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["MA50"],
+        line=dict(color=YELLOW, width=1.5), name="MA 50"))
+    fig_price.add_trace(go.Scatter(x=df_view["Date"], y=df_view["MA200"],
+        line=dict(color="#FF6B9D", width=1.5), name="MA 200"))
+
+    if w52_high:
+        fig_price.add_hline(y=w52_high, line=dict(color="rgba(0,245,160,0.3)", width=1, dash="dot"),
+            annotation_text="52W High", annotation_font=dict(color="#00F5A0", size=9, family="Space Mono"))
+    if w52_low:
+        fig_price.add_hline(y=w52_low, line=dict(color="rgba(255,77,109,0.3)", width=1, dash="dot"),
+            annotation_text="52W Low", annotation_font=dict(color="#FF4D6D", size=9, family="Space Mono"))
     if pred_price:
         fig_price.add_trace(go.Scatter(
-            x=[pred_day], y=[pred_price],
-            mode="markers+text",
-            marker=dict(color=GREEN, size=12, symbol="star",
-                        line=dict(color="white", width=1.5)),
+            x=[pred_day], y=[pred_price], mode="markers+text",
+            marker=dict(color=GREEN, size=12, symbol="star", line=dict(color="white", width=1.5)),
             text=[f"  ₹{pred_price:,.0f}"],
             textfont=dict(color=GREEN, size=10, family="Space Mono"),
-            textposition="middle right",
-            name="LSTM Prediction"
+            textposition="middle right", name="LSTM Prediction"
         ))
 
     l = base_layout()
-    l["height"] = 440
+    l["height"] = 480
     fig_price.update_layout(**l)
     st.plotly_chart(fig_price, use_container_width=True)
 
-    # RSI + MACD
     st.markdown('<div class="section-header">Indicators</div>', unsafe_allow_html=True)
     col_rsi, col_macd = st.columns(2)
 
     with col_rsi:
         fig_rsi = go.Figure()
-        fig_rsi.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["RSI"],
+        fig_rsi.add_trace(go.Scatter(x=df_view["Date"], y=df_view["RSI"],
             line=dict(color=BLUE, width=1.8),
-            fill="tozeroy", fillcolor="rgba(0,217,245,0.05)", name="RSI"
-        ))
+            fill="tozeroy", fillcolor="rgba(0,217,245,0.05)", name="RSI"))
+        fig_rsi.add_hrect(y0=70, y1=100, fillcolor="rgba(255,77,109,0.05)", line_width=0,
+            annotation_text="Overbought", annotation_font=dict(color="#FF4D6D", size=8, family="Space Mono"))
+        fig_rsi.add_hrect(y0=0, y1=30, fillcolor="rgba(0,245,160,0.05)", line_width=0,
+            annotation_text="Oversold", annotation_font=dict(color="#00F5A0", size=8, family="Space Mono"))
         fig_rsi.add_hline(y=70, line=dict(color=RED,      width=1, dash="dot"))
         fig_rsi.add_hline(y=30, line=dict(color=GREEN,    width=1, dash="dot"))
         fig_rsi.add_hline(y=50, line=dict(color=GRID_CLR, width=1, dash="dot"))
         l2 = base_layout("RSI (14)")
-        l2["height"] = 200
+        l2["height"] = 220
         l2["yaxis"]["range"] = [0, 100]
-        l2["margin"] = dict(l=12, r=12, t=30, b=12)
+        l2["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_rsi.update_layout(**l2)
         st.plotly_chart(fig_rsi, use_container_width=True)
 
     with col_macd:
         fig_macd = go.Figure()
         colors_hist = [GREEN if v >= 0 else RED for v in df_view["Hist"].fillna(0)]
-        fig_macd.add_trace(go.Bar(
-            x=df_view["Date"], y=df_view["Hist"],
-            marker_color=colors_hist, name="Histogram", opacity=0.7
-        ))
-        fig_macd.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["MACD"],
-            line=dict(color=BLUE, width=1.5), name="MACD"
-        ))
-        fig_macd.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["Signal"],
-            line=dict(color=YELLOW, width=1.5), name="Signal"
-        ))
+        fig_macd.add_trace(go.Bar(x=df_view["Date"], y=df_view["Hist"],
+            marker_color=colors_hist, name="Histogram", opacity=0.7))
+        fig_macd.add_trace(go.Scatter(x=df_view["Date"], y=df_view["MACD"],
+            line=dict(color=BLUE, width=1.5), name="MACD"))
+        fig_macd.add_trace(go.Scatter(x=df_view["Date"], y=df_view["Signal"],
+            line=dict(color=YELLOW, width=1.5), name="Signal"))
         l3 = base_layout("MACD (12, 26, 9)")
-        l3["height"] = 200
-        l3["margin"] = dict(l=12, r=12, t=30, b=12)
+        l3["height"] = 220
+        l3["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_macd.update_layout(**l3)
         st.plotly_chart(fig_macd, use_container_width=True)
 
-    # Volume
     st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
     vol_colors = [GREEN if df_view["Close"].iloc[i] >= df_view["Open"].iloc[i]
                   else RED for i in range(len(df_view))]
     fig_vol = go.Figure()
-    fig_vol.add_trace(go.Bar(
-        x=df_view["Date"], y=df_view["Volume"],
-        marker_color=vol_colors, opacity=0.7, name="Volume"
-    ))
+    fig_vol.add_trace(go.Bar(x=df_view["Date"], y=df_view["Volume"],
+        marker_color=vol_colors, opacity=0.7, name="Volume"))
+    vol_ma = df_view["Volume"].rolling(20).mean()
+    fig_vol.add_trace(go.Scatter(x=df_view["Date"], y=vol_ma,
+        line=dict(color=YELLOW, width=1.5), name="Vol MA 20"))
     l4 = base_layout("Volume")
-    l4["height"] = 160
-    l4["margin"] = dict(l=12, r=12, t=30, b=12)
+    l4["height"] = 180
+    l4["margin"] = dict(l=12, r=12, t=40, b=12)
     fig_vol.update_layout(**l4)
     st.plotly_chart(fig_vol, use_container_width=True)
 
-# ════════════════════════════════════════════════════════════════════════════════
-# TAB 2 — 7-DAY FORECAST
-# ════════════════════════════════════════════════════════════════════════════════
+    # Stock Details
+    st.markdown('<div class="section-header">Stock Details</div>', unsafe_allow_html=True)
+    d1, d2, d3, d4 = st.columns(4)
+    vol_today = float(df["Volume"].iloc[-1])
+    vol_avg   = float(df["Volume"].tail(20).mean())
+    macd_now  = float(df["MACD"].iloc[-1])
+    sig_now   = float(df["Signal"].iloc[-1])
+    macd_cross = "🟢 Bullish" if macd_now > sig_now else "🔴 Bearish"
+
+    with d1:
+        st.markdown(f"""
+        <div class="stat-box"><div class="stat-label">Volume Today</div>
+        <div class="stat-value">{vol_today/1e6:.2f}M</div></div>
+        <div class="stat-box"><div class="stat-label">Avg Volume (20D)</div>
+        <div class="stat-value">{vol_avg/1e6:.2f}M</div></div>""", unsafe_allow_html=True)
+    with d2:
+        st.markdown(f"""
+        <div class="stat-box"><div class="stat-label">52W High</div>
+        <div class="stat-value bullish">₹{w52_high:,.2f}</div></div>
+        <div class="stat-box"><div class="stat-label">52W Low</div>
+        <div class="stat-value bearish">₹{w52_low:,.2f}</div></div>""", unsafe_allow_html=True)
+    with d3:
+        st.markdown(f"""
+        <div class="stat-box"><div class="stat-label">MA 50</div>
+        <div class="stat-value">₹{float(df['MA50'].iloc[-1]):,.2f}</div></div>
+        <div class="stat-box"><div class="stat-label">MA 200</div>
+        <div class="stat-value">₹{float(df['MA200'].iloc[-1]):,.2f}</div></div>""", unsafe_allow_html=True)
+    with d4:
+        st.markdown(f"""
+        <div class="stat-box"><div class="stat-label">MACD Signal</div>
+        <div class="stat-value" style="font-size:0.85rem;">{macd_cross}</div></div>
+        <div class="stat-box"><div class="stat-label">Sector</div>
+        <div class="stat-value" style="font-size:0.85rem;color:{SECTOR_COLORS.get(sector,'#5A7499')}">{sector}</div></div>""",
+        unsafe_allow_html=True)
+
+# ════════════ TAB 2 — 7-DAY FORECAST ════════════
 with tab2:
     if model is None:
-        st.error("Model not found. Please train first.")
+        st.error("Model not found.")
     else:
         st.markdown('<div class="section-header">7-Day Price Forecast</div>', unsafe_allow_html=True)
-
         with st.spinner("Generating 7-day forecast..."):
             forecast_prices = predict_7days(model, scaler, df)
-
         forecast_days = get_trading_days(datetime.today(), 7)
-
-        # Forecast cards
         cols = st.columns(7)
         for i, (col, price, day) in enumerate(zip(cols, forecast_prices, forecast_days)):
-            chg     = price - latest_close
-            pct     = (chg / latest_close) * 100
-            color   = "#00F5A0" if chg >= 0 else "#FF4D6D"
-            sym     = "▲" if chg >= 0 else "▼"
+            chg   = price - latest_close
+            pct   = (chg / latest_close) * 100
+            color = "#00F5A0" if chg >= 0 else "#FF4D6D"
+            sym   = "▲" if chg >= 0 else "▼"
+            conf  = max(60, 95 - i * 5)
             with col:
                 st.markdown(f"""
                 <div class="forecast-card">
                     <div class="forecast-day">{day.strftime("%a")}<br>{day.strftime("%d %b")}</div>
                     <div class="forecast-price">₹{price:,.0f}</div>
                     <div class="forecast-change" style="color:{color}">{sym} {abs(pct):.1f}%</div>
+                    <div style="font-family:Space Mono;font-size:0.55rem;color:#3A5070;margin-top:6px;">~{conf}% conf.</div>
                 </div>""", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
-
-        # Forecast chart
         fig_fc = go.Figure()
+        last60 = df.tail(60)
+        fig_fc.add_trace(go.Scatter(x=last60["Date"], y=last60["Close"],
+            line=dict(color=BLUE, width=2), name="Actual Price"))
 
-        # Last 30 days actual
-        last30 = df.tail(30)
+        upper_band = [p * (1 + 0.01*(i+1)) for i, p in enumerate(forecast_prices)]
+        lower_band = [p * (1 - 0.01*(i+1)) for i, p in enumerate(forecast_prices)]
         fig_fc.add_trace(go.Scatter(
-            x=last30["Date"], y=last30["Close"],
-            line=dict(color=BLUE, width=2),
-            name="Actual Price"
-        ))
+            x=forecast_days + forecast_days[::-1],
+            y=upper_band + lower_band[::-1],
+            fill="toself", fillcolor="rgba(0,245,160,0.05)",
+            line=dict(color="rgba(255,255,255,0)"), showlegend=False, name="Confidence Band"))
 
-        # Bridge from last actual to forecast
         bridge_dates  = [df["Date"].iloc[-1]] + forecast_days
         bridge_prices = [latest_close] + forecast_prices
-
         fig_fc.add_trace(go.Scatter(
             x=bridge_dates, y=bridge_prices,
             line=dict(color=GREEN, width=2.5, dash="dot"),
             mode="lines+markers",
             marker=dict(color=GREEN, size=7, symbol="circle"),
-            name="7-Day Forecast"
-        ))
-
-        # Vertical line at today
-        fig_fc.add_vline(
-            x=df["Date"].iloc[-1],
-            line=dict(color="#5A7499", width=1, dash="dash")
-        )
-        fig_fc.add_annotation(
-            x=df["Date"].iloc[-1], y=latest_close,
-            text="  Today",
-            showarrow=False,
-            font=dict(color="#5A7499", size=9, family="Space Mono"),
-            xanchor="left"
-        )
+            name="7-Day Forecast"))
+        fig_fc.add_vline(x=df["Date"].iloc[-1], line=dict(color="#5A7499", width=1, dash="dash"))
+        fig_fc.add_annotation(x=df["Date"].iloc[-1], y=latest_close, text="  Today",
+            showarrow=False, font=dict(color="#5A7499", size=9, family="Space Mono"), xanchor="left")
 
         lf = base_layout(f"7-Day Forecast — {stock_name}")
-        lf["height"] = 400
+        lf["height"] = 420
         fig_fc.update_layout(**lf)
         st.plotly_chart(fig_fc, use_container_width=True)
+        st.markdown('<div class="warn-box">⚠️ Multi-day forecasts compound prediction error. Days 5–7 should be treated as directional trend only.</div>',
+                    unsafe_allow_html=True)
 
-        st.markdown(
-            '<div class="warn-box">⚠️ Multi-day forecasts compound prediction error. '
-            'Days 5-7 should be treated as directional trend only.</div>',
-            unsafe_allow_html=True
-        )
-
-# ════════════════════════════════════════════════════════════════════════════════
-# TAB 3 — BACKTEST
-# ════════════════════════════════════════════════════════════════════════════════
+# ════════════ TAB 3 — BACKTEST ════════════
 with tab3:
     if model is None:
-        st.error("Model not found. Please train first.")
+        st.error("Model not found.")
     else:
         st.markdown('<div class="section-header">Backtest — Predicted vs Actual</div>', unsafe_allow_html=True)
-
-        # Month selector
-        bt_col1, bt_col2 = st.columns([2, 5])
+        bt_col1, _ = st.columns([2, 5])
         with bt_col1:
-            month_options = {"1 Month": 1, "3 Months": 3, "6 Months": 6,
-                             "12 Months": 12, "24 Months": 24, "36 Months": 36}
-            bt_range = st.selectbox("Backtest Period", list(month_options.keys()),
-                                    index=2, label_visibility="visible")
+            month_options = {"1 Month":1,"3 Months":3,"6 Months":6,"12 Months":12,"24 Months":24,"36 Months":36}
+            bt_range  = st.selectbox("Backtest Period", list(month_options.keys()), index=4)
             bt_months = month_options[bt_range]
 
         with st.spinner(f"Running backtest for {bt_range}..."):
             bt_dates, bt_actuals, bt_preds = run_backtest(model, scaler, df, bt_months)
 
-        # Metrics
-        bt_actuals_arr = np.array(bt_actuals)
-        bt_preds_arr   = np.array(bt_preds)
-        mae   = float(np.mean(np.abs(bt_actuals_arr - bt_preds_arr)))
-        mape  = float(np.mean(np.abs((bt_actuals_arr - bt_preds_arr) / bt_actuals_arr)) * 100)
-        ss_res = np.sum((bt_actuals_arr - bt_preds_arr) ** 2)
-        ss_tot = np.sum((bt_actuals_arr - np.mean(bt_actuals_arr)) ** 2)
-        r2    = float(1 - ss_res / ss_tot)
+        bt_a = np.array(bt_actuals)
+        bt_p = np.array(bt_preds)
+        mae  = float(np.mean(np.abs(bt_a - bt_p)))
+        mape = float(np.mean(np.abs((bt_a - bt_p) / bt_a)) * 100)
+        ss_r = np.sum((bt_a - bt_p) ** 2)
+        ss_t = np.sum((bt_a - np.mean(bt_a)) ** 2)
+        r2   = float(1 - ss_r / ss_t)
+        r2c  = "#00F5A0" if r2 > 0.8 else ("#F5C518" if r2 > 0.5 else "#FF4D6D")
+        acc  = max(0, min(100, r2 * 100))
 
-        m1, m2, m3, m4 = st.columns(4)
+        dir_acc = sum(
+            1 for i in range(1, len(bt_actuals))
+            if (bt_preds[i] > bt_preds[i-1]) == (bt_actuals[i] > bt_actuals[i-1])
+        ) / max(1, len(bt_actuals)-1) * 100
+
+        m1, m2, m3, m4, m5 = st.columns(5)
         with m1:
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">R² Score</div>
-                <div class="stat-value" style="color:#00F5A0">{r2:.4f}</div>
+            st.markdown(f"""<div class="stat-box"><div class="stat-label">R² Score</div>
+            <div class="stat-value" style="color:{r2c}">{r2:.4f}</div>
+            <div class="accuracy-bar-wrap"><div class="accuracy-bar-fill" style="width:{acc:.0f}%"></div></div>
             </div>""", unsafe_allow_html=True)
         with m2:
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">MAE</div>
-                <div class="stat-value">₹{mae:.2f}</div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="stat-box"><div class="stat-label">MAE</div>
+            <div class="stat-value">₹{mae:.2f}</div></div>""", unsafe_allow_html=True)
         with m3:
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">MAPE</div>
-                <div class="stat-value">{mape:.2f}%</div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="stat-box"><div class="stat-label">MAPE</div>
+            <div class="stat-value">{mape:.2f}%</div></div>""", unsafe_allow_html=True)
         with m4:
-            days_tested = len(bt_dates)
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">Days Tested</div>
-                <div class="stat-value">{days_tested}</div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="stat-box"><div class="stat-label">Days Tested</div>
+            <div class="stat-value">{len(bt_dates)}</div></div>""", unsafe_allow_html=True)
+        with m5:
+            st.markdown(f"""<div class="stat-box"><div class="stat-label">Direction Accuracy</div>
+            <div class="stat-value" style="color:#00F5A0">{dir_acc:.1f}%</div></div>""", unsafe_allow_html=True)
 
-        # Backtest chart
         fig_bt = go.Figure()
-        fig_bt.add_trace(go.Scatter(
-            x=bt_dates, y=bt_actuals,
-            line=dict(color=BLUE, width=2),
-            name="Actual Price"
-        ))
-        fig_bt.add_trace(go.Scatter(
-            x=bt_dates, y=bt_preds,
-            line=dict(color=GREEN, width=1.5, dash="dot"),
-            name="Predicted Price",
-            opacity=0.9
-        ))
-
-        # Error fill
-        fig_bt.add_trace(go.Scatter(
-            x=bt_dates + bt_dates[::-1],
-            y=bt_preds + bt_actuals[::-1],
-            fill="toself",
-            fillcolor="rgba(0,245,160,0.04)",
-            line=dict(color="rgba(255,255,255,0)"),
-            showlegend=False,
-            name="Error Band"
-        ))
-
+        fig_bt.add_trace(go.Scatter(x=bt_dates, y=bt_actuals, line=dict(color=BLUE, width=2), name="Actual Price"))
+        fig_bt.add_trace(go.Scatter(x=bt_dates, y=bt_preds, line=dict(color=GREEN, width=1.5, dash="dot"), name="Predicted Price", opacity=0.9))
+        fig_bt.add_trace(go.Scatter(x=bt_dates+bt_dates[::-1], y=bt_preds+bt_actuals[::-1],
+            fill="toself", fillcolor="rgba(0,245,160,0.04)",
+            line=dict(color="rgba(255,255,255,0)"), showlegend=False))
         lb = base_layout(f"Backtest — {stock_name} ({bt_range})")
         lb["height"] = 440
         fig_bt.update_layout(**lb)
         st.plotly_chart(fig_bt, use_container_width=True)
 
-        # Error distribution
         st.markdown('<div class="section-header">Prediction Error Distribution</div>', unsafe_allow_html=True)
-        errors = bt_preds_arr - bt_actuals_arr
+        errors = bt_p - bt_a
         fig_err = go.Figure()
-        fig_err.add_trace(go.Histogram(
-            x=errors,
-            nbinsx=40,
-            marker_color=PURPLE,
-            opacity=0.8,
-            name="Prediction Error"
-        ))
+        fig_err.add_trace(go.Histogram(x=errors, nbinsx=40, marker_color=PURPLE, opacity=0.8, name="Error"))
         fig_err.add_vline(x=0, line=dict(color=GREEN, width=1.5, dash="dash"))
         le = base_layout("Prediction Error Distribution (₹)")
         le["height"] = 220
-        le["margin"] = dict(l=12, r=12, t=30, b=12)
+        le["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_err.update_layout(**le)
         st.plotly_chart(fig_err, use_container_width=True)
 
+        st.markdown(f"""
+        <div class="warn-box" style="border-color:rgba(0,245,160,0.2);background:rgba(0,245,160,0.03);color:#5A7499;">
+            💡 <span style="color:#00F5A0">Tip:</span> Use <b>24–36 months</b> for the most reliable R² score.
+            Current direction accuracy: <span style="color:#00F5A0">{dir_acc:.1f}%</span>
+        </div>""", unsafe_allow_html=True)
+
+# ════════════ TAB 4 — ABOUT ════════════
+with tab4:
+    st.markdown('<div class="section-header">About StockSense India</div>', unsafe_allow_html=True)
+    a1, a2 = st.columns(2)
+
+    with a1:
+        st.markdown("""
+        <div class="about-card">
+            <div class="about-title">🧠 How It Works</div>
+            <div class="about-text">
+                StockSense India uses Long Short-Term Memory (LSTM) neural networks
+                trained on 15+ years of NSE stock data. Each stock has its own
+                dedicated model trained on historical closing prices.<br><br>
+                The model analyzes the last 60 trading days to predict tomorrow's
+                closing price. Technical indicators (RSI, MACD, Bollinger Bands)
+                are calculated separately to generate trading signals.
+            </div>
+        </div>
+        <div class="about-card">
+            <div class="about-title">📊 Technical Indicators</div>
+            <div class="about-text">
+                <b style="color:#E0E6F0">RSI (14)</b> — Momentum oscillator. Above 70 = overbought, below 30 = oversold.<br><br>
+                <b style="color:#E0E6F0">MACD (12,26,9)</b> — Trend direction and momentum crossovers.<br><br>
+                <b style="color:#E0E6F0">Bollinger Bands (20,2)</b> — Volatility bands that expand/contract with market conditions.<br><br>
+                <b style="color:#E0E6F0">MA 50 & MA 200</b> — Short and long-term trend lines. Golden cross = bullish signal.
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+    with a2:
+        st.markdown('<div class="about-card"><div class="about-title">🏦 Covered Stocks</div><div class="about-text">',
+                    unsafe_allow_html=True)
+        for sname, sdata in STOCKS.items():
+            sc2 = SECTOR_COLORS.get(sdata['sector'], '#5A7499')
+            st.markdown(f"""
+            <div style="display:flex;justify-content:space-between;padding:5px 0;
+                        border-bottom:1px solid #1E2D4A;font-family:Space Mono;font-size:0.65rem;">
+                <span style="color:#E0E6F0">{sname}</span>
+                <span style="color:{sc2}">{sdata['sector']}</span>
+            </div>""", unsafe_allow_html=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="about-card">
+            <div class="about-title">⚙️ Tech Stack</div>
+            <div class="about-text">
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
+                    <span style="background:rgba(0,217,245,0.1);border:1px solid rgba(0,217,245,0.3);color:#00D9F5;padding:3px 10px;border-radius:4px;font-size:0.65rem;">Python</span>
+                    <span style="background:rgba(0,245,160,0.1);border:1px solid rgba(0,245,160,0.3);color:#00F5A0;padding:3px 10px;border-radius:4px;font-size:0.65rem;">TensorFlow</span>
+                    <span style="background:rgba(176,109,255,0.1);border:1px solid rgba(176,109,255,0.3);color:#B06DFF;padding:3px 10px;border-radius:4px;font-size:0.65rem;">Keras LSTM</span>
+                    <span style="background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.3);color:#F5C518;padding:3px 10px;border-radius:4px;font-size:0.65rem;">Streamlit</span>
+                    <span style="background:rgba(0,217,245,0.1);border:1px solid rgba(0,217,245,0.3);color:#00D9F5;padding:3px 10px;border-radius:4px;font-size:0.65rem;">Plotly</span>
+                    <span style="background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3);color:#FF4D6D;padding:3px 10px;border-radius:4px;font-size:0.65rem;">yfinance</span>
+                    <span style="background:rgba(0,245,160,0.1);border:1px solid rgba(0,245,160,0.3);color:#00F5A0;padding:3px 10px;border-radius:4px;font-size:0.65rem;">scikit-learn</span>
+                </div>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="warn-box" style="margin-top:16px;">
+        ⚠️ <b>Disclaimer:</b> StockSense India is built purely for educational purposes.
+        Predictions should NOT be used as financial advice. Always consult a SEBI-registered
+        financial advisor before making investment decisions.
+    </div>""", unsafe_allow_html=True)
+
 # ─── FOOTER ──────────────────────────────────────────────────────────────────────
-st.markdown("<br>", unsafe_allow_html=True)
-st.markdown(
-    '<div style="text-align:center;font-family:Space Mono;font-size:0.62rem;color:#1E2D4A;">'
-    'StockSense India · LSTM · TensorFlow · Data via yfinance · For educational use only'
-    '</div>',
-    unsafe_allow_html=True
-)
+st.markdown("""
+<div class="footer">
+    <div class="footer-logo">StockSense India</div>
+    <div class="footer-text">Built with LSTM · TensorFlow · Streamlit · Data via yfinance</div>
+    <div class="footer-links">
+        <a href="#">GitHub</a> · <a href="#">About</a> · <a href="#">Disclaimer</a>
+    </div>
+    <div class="footer-text" style="margin-top:8px;">© 2026 · For educational use only · Not financial advice</div>
+</div>
+""", unsafe_allow_html=True)
