@@ -407,35 +407,41 @@ def load_data(ticker):
         try:
             data = yf.download(ticker, start="2010-01-01",
                                end=datetime.today().strftime("%Y-%m-%d"),
-                               progress=False, timeout=30)
+                               progress=False, timeout=30,auto_adjust=True)
             if data.empty:
                 continue
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
-            data.reset_index(inplace=True)
-            return data
-        except Exception:
+            data.index.name ="Date"
+            data= data.reset_index()
+            if "Date" not in data.columns:
+                data["Date"] = data.index
+            data["Date"] = pd.to_datetime(data["Date"])
+            return data        
+        except Exception as e:
             if attempt == 2:
                 return None
     return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def load_index_data():
     indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANK NIFTY": "^NSEBANK"}
     result = {}
     for name, ticker in indices.items():
         try:
-            d = yf.download(ticker, period="2d", progress=False, timeout=10)
+            d = yf.download(ticker, period="5d", progress=False, timeout=15)
             if not d.empty:
                 if isinstance(d.columns, pd.MultiIndex):
                     d.columns = d.columns.get_level_values(0)
-                curr = float(d["Close"].iloc[-1])
-                prev = float(d["Close"].iloc[-2])
-                chg  = curr - prev
-                pct  = (chg / prev) * 100
-                result[name] = {"price": curr, "change": chg, "pct": pct}
+                d = d.reset_index()
+                if len(d) >= 2:   
+                    curr = float(d["Close"].iloc[-1])
+                    prev = float(d["Close"].iloc[-2])
+                    chg  = curr - prev
+                    pct  = (chg / prev) * 100
+                    result[name] = {"price": curr, "change": chg, "pct": pct}
         except Exception:
-            pass
+            result[name] = {"price": 0, "change": 0, "pct": 0}
     return result
 
 @st.cache_resource
@@ -657,6 +663,14 @@ with st.sidebar:
         indices = load_index_data()
 
     for idx_name, idx_data in indices.items():
+        if idx_data["price"] == 0:
+            st.markdown(f"""
+            <div class="index-card">
+                <div class="index-name">{idx_name}</div>
+                <div class="index-value" style="color:#3A5070">N/A</div>
+                <div class="index-change" style="color:#3A5070">Rate limited</div>
+        </div>""", unsafe_allow_html=True)
+    else:
         chg_color = "#00F5A0" if idx_data["change"] >= 0 else "#FF4D6D"
         chg_sym   = "▲" if idx_data["change"] >= 0 else "▼"
         st.markdown(f"""
