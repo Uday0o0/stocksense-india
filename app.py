@@ -1,12 +1,21 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import yfinance as yf
-import pickle
-import os
 from datetime import datetime, timedelta
-from keras.models import load_model
 import plotly.graph_objects as go
+
+from constants import SECTOR_COLORS, STOCKS
+from data_utils import load_data, load_index_data
+from indicators import add_indicators, get_52w, get_signal
+from market import is_market_open
+from model_utils import (
+    get_trading_days,
+    load_model_and_scaler,
+    next_trading_day,
+    predict_7days,
+    predict_tomorrow,
+    run_backtest,
+)
 
 # ─── PAGE CONFIG ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -376,194 +385,6 @@ hr { border-color: #1E2D4A !important; }
 .footer-links a:hover { color: #00F5A0; }
 </style>
 """, unsafe_allow_html=True)
-
-# ─── CONSTANTS ───────────────────────────────────────────────────────────────────
-STOCKS = {
-    "Reliance Industries": {"ticker": "RELIANCE.NS",  "model": "Reliance",      "sector": "Energy"},
-    "TCS":                 {"ticker": "TCS.NS",        "model": "TCS",           "sector": "IT"},
-    "Infosys":             {"ticker": "INFY.NS",       "model": "Infosys",       "sector": "IT"},
-    "HDFC Bank":           {"ticker": "HDFCBANK.NS",   "model": "HDFC_Bank",     "sector": "Banking"},
-    "ICICI Bank":          {"ticker": "ICICIBANK.NS",  "model": "ICICI_Bank",    "sector": "Banking"},
-    "Wipro":               {"ticker": "WIPRO.NS",      "model": "Wipro",         "sector": "IT"},
-    "Bajaj Finance":       {"ticker": "BAJFINANCE.NS", "model": "Bajaj_Finance", "sector": "NBFC"},
-    "Bharti Airtel":       {"ticker": "BHARTIARTL.NS", "model": "Bharti_Airtel", "sector": "Telecom"},
-    "Larsen & Toubro":     {"ticker": "LT.NS",         "model": "LT",            "sector": "Infrastructure"},
-    "Asian Paints":        {"ticker": "ASIANPAINT.NS", "model": "Asian_Paints",  "sector": "Consumer"},
-}
-
-SECTOR_COLORS = {
-    "Energy": "#FF8C42", "IT": "#00D9F5", "Banking": "#B06DFF",
-    "NBFC": "#F5C518",   "Telecom": "#00F5A0", "Infrastructure": "#FF6B9D",
-    "Consumer": "#7EB8F5",
-}
-
-SAVE_DIR = os.path.dirname(__file__)
-LOOKBACK = 60
-
-# ─── HELPERS ─────────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300)
-def load_data(ticker):
-    for attempt in range(3):
-        try:
-            data = yf.download(ticker, start="2010-01-01",
-                               end=datetime.today().strftime("%Y-%m-%d"),
-                               progress=False, timeout=30,auto_adjust=True)
-            if data.empty:
-                continue
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = data.columns.get_level_values(0)
-            data.index.name ="Date"
-            data= data.reset_index()
-            if "Date" not in data.columns:
-                data["Date"] = data.index
-            data["Date"] = pd.to_datetime(data["Date"])
-            return data        
-        except Exception as e:
-            if attempt == 2:
-                return None
-    return None
-
-@st.cache_data(ttl=600)
-def load_index_data():
-    indices = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "BANK NIFTY": "^NSEBANK"}
-    result = {}
-    for name, ticker in indices.items():
-        try:
-            d = yf.download(ticker, period="5d", progress=False, timeout=15)
-            if not d.empty:
-                if isinstance(d.columns, pd.MultiIndex):
-                    d.columns = d.columns.get_level_values(0)
-                d = d.reset_index()
-                if len(d) >= 2:   
-                    curr = float(d["Close"].iloc[-1])
-                    prev = float(d["Close"].iloc[-2])
-                    chg  = curr - prev
-                    pct  = (chg / prev) * 100
-                    result[name] = {"price": curr, "change": chg, "pct": pct}
-        except Exception:
-            result[name] = {"price": 0, "change": 0, "pct": 0}
-    return result
-
-@st.cache_resource
-def load_model_and_scaler(model_name):
-    model_path  = os.path.join(SAVE_DIR, f"{model_name}_model.keras")
-    scaler_path = os.path.join(SAVE_DIR, f"{model_name}_scaler.pkl")
-    if not os.path.exists(model_path) or not os.path.exists(scaler_path):
-        return None, None
-    model  = load_model(model_path)
-    scaler = pickle.load(open(scaler_path, "rb"))
-    return model, scaler
-
-def calc_rsi(source, length=14):
-    change   = pd.Series(source).diff()
-    up       = change.clip(lower=0)
-    down     = -change.clip(upper=0)
-    alpha    = 1 / length
-    up_rma   = up.ewm(alpha=alpha, adjust=False).mean()
-    down_rma = down.ewm(alpha=alpha, adjust=False).mean()
-    rsi = np.where(down_rma == 0, 100,
-          np.where(up_rma   == 0,   0,
-          100 - (100 / (1 + up_rma / down_rma))))
-    return pd.Series(rsi, index=pd.Series(source).index)
-
-def add_indicators(df):
-    df = df.copy()
-    c = df["Close"]
-    df["MA50"]     = c.rolling(50).mean()
-    df["MA200"]    = c.rolling(200).mean()
-    df["RSI"]      = calc_rsi(c)
-    ema12          = c.ewm(span=12, adjust=False).mean()
-    ema26          = c.ewm(span=26, adjust=False).mean()
-    df["MACD"]     = ema12 - ema26
-    df["Signal"]   = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["Hist"]     = df["MACD"] - df["Signal"]
-    bb_mid         = c.rolling(20).mean()
-    bb_std         = c.rolling(20).std()
-    df["BB_Mid"]   = bb_mid
-    df["BB_Upper"] = bb_mid + 2 * bb_std
-    df["BB_Lower"] = bb_mid - 2 * bb_std
-    return df
-
-def get_signal(df):
-    latest = df.iloc[-1]
-    rsi    = latest["RSI"]
-    ma50   = latest["MA50"]
-    ma200  = latest["MA200"]
-    close  = latest["Close"]
-    score  = 0
-    if rsi < 35:   score += 2
-    elif rsi > 70: score -= 2
-    if close > ma50:  score += 1
-    if ma50 > ma200:  score += 1
-    if close < ma50:  score -= 1
-    if ma50 < ma200:  score -= 1
-    if   score >= 2:  return "BUY",  "badge-buy",  "bullish"
-    elif score <= -2: return "SELL", "badge-sell", "bearish"
-    else:             return "HOLD", "badge-hold", "neutral"
-
-def is_market_open():
-    now      = datetime.now()
-    ist_hour = (now.hour + 5) % 24
-    ist_min  = (now.minute + 30) % 60
-    ist_time = ist_hour * 60 + ist_min
-    return now.weekday() < 5 and 555 <= ist_time <= 930
-
-def next_trading_day(from_date):
-    d = from_date + timedelta(days=1)
-    while d.weekday() >= 5:
-        d += timedelta(days=1)
-    return d
-
-def get_trading_days(from_date, n):
-    days, d = [], from_date
-    while len(days) < n:
-        d = d + timedelta(days=1)
-        if d.weekday() < 5:
-            days.append(d)
-    return days
-
-def predict_one(model, scaler, sequence):
-    seq   = sequence[-LOOKBACK:].reshape(1, LOOKBACK, 1)
-    pred  = model.predict(seq, verbose=0)
-    return float(scaler.inverse_transform(pred)[0][0])
-
-def predict_tomorrow(model, scaler, df):
-    close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
-    scaled = scaler.transform(close)
-    return predict_one(model, scaler, scaled)
-
-def predict_7days(model, scaler, df):
-    close  = df["Close"].to_numpy().flatten().reshape(-1, 1)
-    scaled = scaler.transform(close).flatten().tolist()
-    preds, seq = [], scaled.copy()
-    for _ in range(7):
-        inp   = np.array(seq[-LOOKBACK:]).reshape(1, LOOKBACK, 1)
-        pred  = model.predict(inp, verbose=0)
-        price = float(scaler.inverse_transform(pred)[0][0])
-        seq.append(float(scaler.transform([[price]])[0][0]))
-        preds.append(price)
-    return preds
-
-def run_backtest(model, scaler, df, months):
-    close   = df["Close"].to_numpy().flatten().reshape(-1, 1)
-    scaled  = scaler.transform(close).flatten()
-    days    = int(months * 21)
-    start_i = max(LOOKBACK, len(scaled) - days - 1)
-    actuals, preds, dates = [], [], []
-    for i in range(start_i, len(scaled)):
-        seq   = scaled[i - LOOKBACK:i].reshape(1, LOOKBACK, 1)
-        pred  = model.predict(seq, verbose=0)
-        preds.append(float(scaler.inverse_transform(pred)[0][0]))
-        actuals.append(float(close[i][0]))
-        dates.append(df["Date"].iloc[i])
-    return dates, actuals, preds
-
-def get_52w(df):
-    one_year_ago = pd.Timestamp(datetime.today() - timedelta(days=365))
-    df_1y = df[df["Date"] >= one_year_ago]
-    if df_1y.empty:
-        return None, None
-    return float(df_1y["Low"].min()), float(df_1y["High"].max())
 
 # ─── PLOTLY THEME ────────────────────────────────────────────────────────────────
 PLOT_BG  = "#090E1A"
