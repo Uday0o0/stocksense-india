@@ -80,3 +80,54 @@ def run_backtest(model, scaler, df, months):
         actuals.append(float(close[i][0]))
         dates.append(df["Date"].iloc[i])
     return dates, actuals, preds
+
+
+def run_baseline_backtest(df, months):
+    close = df["Close"].to_numpy().flatten()
+    days = int(months * 21)
+    start_i = max(LOOKBACK, len(close) - days - 1)
+    actuals, naive_preds, ma7_preds, dates = [], [], [], []
+
+    for i in range(start_i, len(close)):
+        actuals.append(float(close[i]))
+        naive_preds.append(float(close[i - 1]))
+        ma7_preds.append(float(np.mean(close[max(0, i - 7):i])))
+        dates.append(df["Date"].iloc[i])
+    return dates, actuals, naive_preds, ma7_preds
+
+
+def calculate_backtest_metrics(actuals, preds):
+    actuals = np.asarray(actuals, dtype=float)
+    preds = np.asarray(preds, dtype=float)
+    errors = actuals - preds
+
+    mae = float(np.mean(np.abs(errors)))
+    nonzero_actuals = np.where(actuals == 0, np.nan, actuals)
+    mape = float(np.nanmean(np.abs(errors / nonzero_actuals)) * 100)
+
+    ss_res = float(np.sum(errors ** 2))
+    ss_tot = float(np.sum((actuals - np.mean(actuals)) ** 2))
+    r2 = float(1 - ss_res / ss_tot) if ss_tot else 0.0
+
+    if len(actuals) > 1:
+        direction_accuracy = sum(
+            1
+            for i in range(1, len(actuals))
+            if (preds[i] > preds[i - 1]) == (actuals[i] > actuals[i - 1])
+        ) / (len(actuals) - 1) * 100
+    else:
+        direction_accuracy = 0.0
+
+    return {
+        "mae": mae,
+        "mape": mape,
+        "r2": r2,
+        "direction_accuracy": float(direction_accuracy),
+        "errors": preds - actuals,
+    }
+
+
+def forecast_confidence_series(backtest_mape, horizon=7):
+    base_confidence = max(35, min(90, 100 - backtest_mape * 5))
+    daily_decay = max(4, min(10, backtest_mape))
+    return [max(30, base_confidence - i * daily_decay) for i in range(horizon)]

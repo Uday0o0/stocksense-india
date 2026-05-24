@@ -9,11 +9,14 @@ from data_utils import load_data, load_index_data
 from indicators import add_indicators, get_52w, get_signal
 from market import is_market_open
 from model_utils import (
+    calculate_backtest_metrics,
+    forecast_confidence_series,
     get_trading_days,
     load_model_and_scaler,
     next_trading_day,
     predict_7days,
     predict_tomorrow,
+    run_baseline_backtest,
     run_backtest,
 )
 
@@ -857,6 +860,9 @@ with tab2:
         st.markdown('<div class="section-header">7-Day Price Forecast</div>', unsafe_allow_html=True)
         with st.spinner("Generating 7-day forecast..."):
             forecast_prices = predict_7days(model, scaler, df)
+            _, recent_actuals, recent_preds = run_backtest(model, scaler, df, 6)
+            recent_metrics = calculate_backtest_metrics(recent_actuals, recent_preds)
+            confidence_scores = forecast_confidence_series(recent_metrics["mape"], len(forecast_prices))
         forecast_days = get_trading_days(datetime.today(), 7)
         cols = st.columns(7)
         for i, (col, price, day) in enumerate(zip(cols, forecast_prices, forecast_days)):
@@ -864,14 +870,14 @@ with tab2:
             pct   = (chg / latest_close) * 100
             color = "#00F5A0" if chg >= 0 else "#FF4D6D"
             sym   = "▲" if chg >= 0 else "▼"
-            conf  = max(60, 95 - i * 5)
+            conf  = confidence_scores[i]
             with col:
                 st.markdown(f"""
                 <div class="forecast-card">
                     <div class="forecast-day">{day.strftime("%a")}<br>{day.strftime("%d %b")}</div>
                     <div class="forecast-price">₹{price:,.0f}</div>
                     <div class="forecast-change" style="color:{color}">{sym} {abs(pct):.1f}%</div>
-                    <div style="font-family:Space Mono;font-size:0.55rem;color:#3A5070;margin-top:6px;">~{conf}% conf.</div>
+                    <div style="font-family:Space Mono;font-size:0.55rem;color:#3A5070;margin-top:6px;">~{conf:.0f}% conf.</div>
                 </div>""", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -883,10 +889,11 @@ with tab2:
             hovertemplate="Close: ₹%{y:,.2f}<extra></extra>"
         ))
 
-        # Volatility-based confidence band (realistic uncertainty cone)
+        # Backtest-adjusted uncertainty cone.
         returns_std = float(df["Close"].pct_change().tail(60).std())
-        upper_band = [p * (1 + returns_std * np.sqrt(i+1)) for i, p in enumerate(forecast_prices)]
-        lower_band = [p * (1 - returns_std * np.sqrt(i+1)) for i, p in enumerate(forecast_prices)]
+        error_rate = max(returns_std, recent_metrics["mape"] / 100)
+        upper_band = [p * (1 + error_rate * np.sqrt(i+1)) for i, p in enumerate(forecast_prices)]
+        lower_band = [p * (1 - error_rate * np.sqrt(i+1)) for i, p in enumerate(forecast_prices)]
 
         fig_fc.add_trace(go.Scatter(
             x=forecast_days + forecast_days[::-1],
@@ -912,8 +919,11 @@ with tab2:
         lf["height"] = 420
         fig_fc.update_layout(**lf)
         st.plotly_chart(fig_fc, use_container_width=True, config=CHART_CONFIG)
-        st.markdown('<div class="warn-box">⚠️ Multi-day forecasts compound prediction error. Days 5–7 should be treated as directional trend only.</div>',
-                    unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="warn-box">
+            ⚠️ Confidence is estimated from the last 6 months of backtest error
+            (MAPE: {recent_metrics["mape"]:.2f}%). Multi-day forecasts compound prediction error.
+        </div>""", unsafe_allow_html=True)
 
 # ════════════ TAB 3 — BACKTEST ════════════
 with tab3:
@@ -929,21 +939,19 @@ with tab3:
 
         with st.spinner(f"Running backtest for {bt_range}..."):
             bt_dates, bt_actuals, bt_preds = run_backtest(model, scaler, df, bt_months)
+            _, _, naive_preds, ma7_preds = run_baseline_backtest(df, bt_months)
 
         bt_a = np.array(bt_actuals)
         bt_p = np.array(bt_preds)
-        mae  = float(np.mean(np.abs(bt_a - bt_p)))
-        mape = float(np.mean(np.abs((bt_a - bt_p) / bt_a)) * 100)
-        ss_r = np.sum((bt_a - bt_p) ** 2)
-        ss_t = np.sum((bt_a - np.mean(bt_a)) ** 2)
-        r2   = float(1 - ss_r / ss_t)
+        lstm_metrics = calculate_backtest_metrics(bt_actuals, bt_preds)
+        naive_metrics = calculate_backtest_metrics(bt_actuals, naive_preds)
+        ma7_metrics = calculate_backtest_metrics(bt_actuals, ma7_preds)
+        mae = lstm_metrics["mae"]
+        mape = lstm_metrics["mape"]
+        r2 = lstm_metrics["r2"]
         r2c  = "#00F5A0" if r2 > 0.8 else ("#F5C518" if r2 > 0.5 else "#FF4D6D")
         acc  = max(0, min(100, r2 * 100))
-
-        dir_acc = sum(
-            1 for i in range(1, len(bt_actuals))
-            if (bt_preds[i] > bt_preds[i-1]) == (bt_actuals[i] > bt_actuals[i-1])
-        ) / max(1, len(bt_actuals)-1) * 100
+        dir_acc = lstm_metrics["direction_accuracy"]
 
         m1, m2, m3, m4, m5 = st.columns(5)
         with m1:
@@ -963,6 +971,36 @@ with tab3:
         with m5:
             st.markdown(f"""<div class="stat-box"><div class="stat-label">Direction Accuracy</div>
             <div class="stat-value" style="color:#00F5A0">{dir_acc:.1f}%</div></div>""", unsafe_allow_html=True)
+
+        st.markdown('<div class="section-header">Baseline Comparison</div>', unsafe_allow_html=True)
+        baseline_cols = st.columns(3)
+        best_mape = min(mape, naive_metrics["mape"], ma7_metrics["mape"])
+        lift_vs_naive = naive_metrics["mape"] - mape
+        baseline_cards = [
+            ("LSTM", mape, mae, dir_acc),
+            ("Naive Close", naive_metrics["mape"], naive_metrics["mae"], naive_metrics["direction_accuracy"]),
+            ("7D Average", ma7_metrics["mape"], ma7_metrics["mae"], ma7_metrics["direction_accuracy"]),
+        ]
+        for col, (label, card_mape, card_mae, card_dir) in zip(baseline_cols, baseline_cards):
+            color = "#00F5A0" if card_mape == best_mape else "#5A7499"
+            with col:
+                st.markdown(f"""
+                <div class="stat-box">
+                    <div class="stat-label">{label}</div>
+                    <div class="stat-value" style="color:{color}">{card_mape:.2f}%</div>
+                    <div style="font-family:Space Mono;font-size:0.62rem;color:#5A7499;margin-top:6px;">
+                        MAE ₹{card_mae:.2f} · Dir {card_dir:.1f}%
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+        lift_color = "#00F5A0" if lift_vs_naive > 0 else "#FF4D6D"
+        lift_word = "beats" if lift_vs_naive > 0 else "trails"
+        st.markdown(f"""
+        <div class="warn-box" style="border-color:rgba(0,245,160,0.2);background:rgba(0,245,160,0.03);color:#5A7499;">
+            LSTM {lift_word} the naive close baseline by
+            <span style="color:{lift_color}">{abs(lift_vs_naive):.2f} MAPE points</span>
+            over this period.
+        </div>""", unsafe_allow_html=True)
 
         fig_bt = go.Figure()
         fig_bt.add_trace(go.Scatter(
