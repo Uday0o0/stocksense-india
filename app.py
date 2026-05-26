@@ -11,6 +11,7 @@ from market import is_market_open
 from model_utils import (
     calculate_backtest_metrics,
     forecast_confidence_series,
+    get_model_artifact_info,
     get_trading_days,
     load_model_and_scaler,
     next_trading_day,
@@ -25,7 +26,7 @@ st.set_page_config(
     page_title="StockSense India",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ─── CUSTOM CSS ─────────────────────────────────────────────────────────────────
@@ -450,71 +451,74 @@ def base_layout(title=""):
         ),
     )
 
-# ─── SIDEBAR ─────────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown('<div class="logo-header">StockSense</div>', unsafe_allow_html=True)
-    st.markdown('<div class="logo-sub">India · AI Predictions</div>', unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
+# ── TOP INDEX BAR ────────────────────────────────────────────
+indices = load_index_data()
 
-    market_open = is_market_open()
-    if market_open:
-        st.markdown('<span class="market-open-badge">● Market Open</span>', unsafe_allow_html=True)
-    else:
-        st.markdown('<span class="market-closed-badge">● Market Closed</span>', unsafe_allow_html=True)
+index_html = '<div style="display:flex;gap:12px;padding:10px 0;overflow-x:auto;border-bottom:1px solid #1E2D4A;margin-bottom:16px;">'
+for idx_name, idx_data in indices.items():
+    if idx_data["price"] == 0:
+        continue
+    chg_color = "#00F5A0" if idx_data["change"] >= 0 else "#FF4D6D"
+    chg_sym   = "▲" if idx_data["change"] >= 0 else "▼"
+    index_html += f"""
+    <div style="background:#0D1525;border:1px solid #1E2D4A;border-radius:8px;
+                padding:8px 16px;white-space:nowrap;min-width:140px;">
+        <div style="font-family:Space Mono;font-size:0.6rem;color:#5A7499;
+                    text-transform:uppercase;letter-spacing:0.1em;">{idx_name}</div>
+        <div style="font-family:Syne,sans-serif;font-size:0.95rem;
+                    font-weight:700;color:#E0E6F0;">{idx_data['price']:,.2f}</div>
+        <div style="font-family:Space Mono;font-size:0.62rem;color:{chg_color};">
+            {chg_sym} {abs(idx_data['pct']):.2f}%</div>
+    </div>"""
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Select Stock</div>', unsafe_allow_html=True)
-    stock_name = st.selectbox("Stock", list(STOCKS.keys()), label_visibility="collapsed")
+# Add market status + logo in same bar
+market_open = is_market_open()
+mbadge_color = "#00F5A0" if market_open else "#FF4D6D"
+mbadge_text  = "● Market Open" if market_open else "● Market Closed"
+index_html += f"""
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+        <span style="font-family:Space Mono;font-size:0.68rem;
+                     color:{mbadge_color};">{mbadge_text}</span>
+        <div style="font-family:Syne,sans-serif;font-size:1.2rem;font-weight:800;
+                    background:linear-gradient(90deg,#00F5A0,#00D9F5);
+                    -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+            StockSense</div>
+    </div>"""
+index_html += '</div>'
+st.markdown(index_html, unsafe_allow_html=True)
 
-    sector       = STOCKS[stock_name]["sector"]
-    sector_color = SECTOR_COLORS.get(sector, "#5A7499")
-    st.markdown(f"""
-    <div class="sidebar-stock-info">
-        <span style="color:{sector_color}">■</span> {sector} &nbsp;·&nbsp;
-        <span style="color:#3A5070">NSE</span>
-    </div>""", unsafe_allow_html=True)
+# ─── LOAD DATA & MODEL ───────────────────────────────────────────────────────────
+# ── LOAD DATA & MODEL ────────────────────────────────────────
+# Stock selector dropdown directly here
+col_stock, col_range, col_refresh = st.columns([2, 2, 1])
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Chart Range</div>', unsafe_allow_html=True)
-    range_option = st.selectbox("Range", ["3 Months", "6 Months", "1 Year", "2 Years", "Max"],
-                                label_visibility="collapsed")
+with col_stock:
+    stock_name = st.selectbox(
+        "Select Stock",
+        list(STOCKS.keys()),
+        index=0,
+        key="stock_selector"
+    )
+
+with col_range:
+    range_option = st.selectbox(
+        "Chart Range",
+        ["3 Months", "6 Months", "1 Year", "2 Years", "Max"],
+        index=2,
+        key="range_selector"
+    )
     range_map = {"3 Months": 90, "6 Months": 180, "1 Year": 365, "2 Years": 730, "Max": 9999}
     days_back = range_map[range_option]
 
+with col_refresh:
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Market Indices</div>', unsafe_allow_html=True)
-    with st.spinner(""):
-        indices = load_index_data()
+    if st.button("↻ Refresh", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
-    for idx_name, idx_data in indices.items():
-        if idx_data["price"] == 0:
-            st.markdown(f"""
-            <div class="index-card">
-                <div class="index-name">{idx_name}</div>
-                <div class="index-value" style="color:#3A5070">N/A</div>
-                <div class="index-change" style="color:#3A5070">Rate limited</div>
-        </div>""", unsafe_allow_html=True)
-    else:
-        chg_color = "#00F5A0" if idx_data["change"] >= 0 else "#FF4D6D"
-        chg_sym   = "▲" if idx_data["change"] >= 0 else "▼"
-        st.markdown(f"""
-        <div class="index-card">
-            <div class="index-name">{idx_name}</div>
-            <div class="index-value">{idx_data['price']:,.2f}</div>
-            <div class="index-change" style="color:{chg_color}">
-                {chg_sym} {abs(idx_data['pct']):.2f}%
-            </div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="warn-box">⚠️ For educational use only. Not financial advice.</div>',
-                unsafe_allow_html=True)
-
-# ─── LOAD DATA & MODEL ───────────────────────────────────────────────────────────
 ticker     = STOCKS[stock_name]["ticker"]
 model_name = STOCKS[stock_name]["model"]
 sector     = STOCKS[stock_name]["sector"]
-
 col_title, col_refresh = st.columns([5, 1])
 with col_title:
     sc     = SECTOR_COLORS.get(sector, "#5A7499")
@@ -558,6 +562,7 @@ w52_low, w52_high = get_52w(df)
 
 with st.spinner("Loading LSTM model..."):
     model, scaler = load_model_and_scaler(model_name)
+artifact_info = get_model_artifact_info(model_name)
 
 pred_price = pred_change = pred_pct = pred_day = None
 if model is not None:
@@ -567,6 +572,29 @@ if model is not None:
     pred_day    = next_trading_day(datetime.today())
 
 signal, badge_class, signal_class = get_signal(df)
+
+latest_data_date = pd.to_datetime(df["Date"].iloc[-1]).strftime("%d %b %Y")
+model_updated = artifact_info["latest_modified_at"]
+model_updated_label = model_updated.strftime("%d %b %Y") if model_updated else "Unavailable"
+artifact_age = artifact_info["oldest_age_days"]
+missing_artifacts = not artifact_info["model"]["exists"] or not artifact_info["scaler"]["exists"]
+if missing_artifacts:
+    freshness_color = "#FF4D6D"
+    freshness_note = "Missing artifact"
+elif artifact_age is not None and artifact_age <= 30:
+    freshness_color = "#00F5A0"
+    freshness_note = "Fresh"
+else:
+    freshness_color = "#F5C518"
+    freshness_note = "Review age"
+
+st.markdown(f"""
+<div class="warn-box" style="display:flex;flex-wrap:wrap;gap:18px;align-items:center;border-color:rgba(0,217,245,0.18);background:rgba(0,217,245,0.03);">
+    <span><b style="color:#E0E6F0">Latest data:</b> {latest_data_date}</span>
+    <span><b style="color:#E0E6F0">Model updated:</b> {model_updated_label}</span>
+    <span><b style="color:{freshness_color}">{freshness_note}</b></span>
+</div>
+""", unsafe_allow_html=True)
 
 # ─── KPI ROW ─────────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)

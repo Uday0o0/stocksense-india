@@ -1,18 +1,29 @@
 import os
 import pickle
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import numpy as np
-import streamlit as st
-from keras.models import load_model
 
 from constants import LOOKBACK, SAVE_DIR
 
+try:
+    import streamlit as st
+except ModuleNotFoundError:
+    st = None
 
-@st.cache_resource
+
+def cache_resource(func):
+    if st is None:
+        return func
+    return st.cache_resource(func)
+
+
+@cache_resource
 def load_model_and_scaler(model_name):
-    model_path = os.path.join(SAVE_DIR, f"{model_name}_model.keras")
-    scaler_path = os.path.join(SAVE_DIR, f"{model_name}_scaler.pkl")
+    from keras.models import load_model
+
+    model_path = os.path.join(SAVE_DIR, "models", f"{model_name}_model.keras")
+    scaler_path = os.path.join(SAVE_DIR, "scalers", f"{model_name}_scaler.pkl")
     if not os.path.exists(model_path) or not os.path.exists(scaler_path):
         return None, None
 
@@ -20,6 +31,37 @@ def load_model_and_scaler(model_name):
     with open(scaler_path, "rb") as scaler_file:
         scaler = pickle.load(scaler_file)
     return model, scaler
+
+
+def get_model_artifact_info(model_name):
+    artifacts = {
+        "model": os.path.join(SAVE_DIR, "models", f"{model_name}_model.keras"),
+        "scaler": os.path.join(SAVE_DIR, "scalers", f"{model_name}_scaler.pkl"),
+    }
+    info = {}
+
+    for label, path in artifacts.items():
+        exists = os.path.exists(path)
+        modified_at = datetime.fromtimestamp(os.path.getmtime(path)) if exists else None
+        age_days = (datetime.now() - modified_at).days if modified_at else None
+        info[label] = {
+            "path": path,
+            "exists": exists,
+            "modified_at": modified_at,
+            "age_days": age_days,
+        }
+
+    available_dates = [
+        item["modified_at"]
+        for item in info.values()
+        if item["modified_at"] is not None
+    ]
+    info["latest_modified_at"] = max(available_dates) if available_dates else None
+    info["oldest_age_days"] = max(
+        (item["age_days"] for item in info.values() if isinstance(item, dict) and item["age_days"] is not None),
+        default=None,
+    )
+    return info
 
 
 def next_trading_day(from_date):
