@@ -632,6 +632,14 @@ with main_col:
     else:
         df_view = df.copy()
 
+    # Calculate chart range (3x the selected window to support panning/scrolling without clipping)
+    chart_days = days_back * 3 if days_back < 9999 else 9999
+    if chart_days < 9999:
+        cutoff_chart = pd.Timestamp(datetime.today() - timedelta(days=chart_days))
+        df_chart = df[df["Date"] >= cutoff_chart].copy()
+    else:
+        df_chart = df.copy()
+
     latest_close = float(df["Close"].iloc[-1])
     prev_close   = float(df["Close"].iloc[-2])
     day_change   = latest_close - prev_close
@@ -755,9 +763,9 @@ with main_col:
 
         # Candlestick — improved styling
         fig_price.add_trace(go.Candlestick(
-            x=df["Date"],
-            open=df["Open"], high=df["High"],
-            low=df["Low"],   close=df["Close"],
+            x=df_chart["Date"],
+            open=df_chart["Open"], high=df_chart["High"],
+            low=df_chart["Low"],   close=df_chart["Close"],
             increasing=dict(line=dict(color="#00F5A0", width=1.2), fillcolor="rgba(0,245,160,0.75)"),
             decreasing=dict(line=dict(color="#FF4D6D", width=1.2), fillcolor="rgba(255,77,109,0.75)"),
             whiskerwidth=0.3,
@@ -766,20 +774,20 @@ with main_col:
 
         # Bollinger Bands
         fig_price.add_trace(go.Scatter(
-            x=df["Date"], y=df["BB_Upper"],
+            x=df_chart["Date"], y=df_chart["BB_Upper"],
             line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
             name="BB Upper",
             hovertemplate="BB Upper: ₹%{y:,.2f}<extra></extra>"
         ))
         fig_price.add_trace(go.Scatter(
-            x=df["Date"], y=df["BB_Lower"],
+            x=df_chart["Date"], y=df_chart["BB_Lower"],
             fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
             line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
             name="BB Lower",
             hovertemplate="BB Lower: ₹%{y:,.2f}<extra></extra>"
         ))
         fig_price.add_trace(go.Scatter(
-            x=df["Date"], y=df["BB_Mid"],
+            x=df_chart["Date"], y=df_chart["BB_Mid"],
             line=dict(color="rgba(0,217,245,0.5)", width=1),
             name="BB Mid",
             hovertemplate="BB Mid: ₹%{y:,.2f}<extra></extra>"
@@ -787,13 +795,13 @@ with main_col:
 
         # Moving Averages
         fig_price.add_trace(go.Scatter(
-            x=df["Date"], y=df["MA50"],
+            x=df_chart["Date"], y=df_chart["MA50"],
             line=dict(color=YELLOW, width=1.5),
             name="MA 50",
             hovertemplate="MA50: ₹%{y:,.2f}<extra></extra>"
         ))
         fig_price.add_trace(go.Scatter(
-            x=df["Date"], y=df["MA200"],
+            x=df_chart["Date"], y=df_chart["MA200"],
             line=dict(color="#FF6B9D", width=1.5),
             name="MA 200",
             hovertemplate="MA200: ₹%{y:,.2f}<extra></extra>"
@@ -818,22 +826,22 @@ with main_col:
                 hovertemplate="LSTM Pred: ₹%{y:,.2f}<extra></extra>"
             ))
 
-        # Get visible Y range for initial scaling (including BB bands and predictions if any)
-        visible_min = float(df_view["Low"].min())
-        visible_max = float(df_view["High"].max())
-        if "BB_Lower" in df_view.columns and not df_view["BB_Lower"].dropna().empty:
-            visible_min = min(visible_min, float(df_view["BB_Lower"].min()))
-        if "BB_Upper" in df_view.columns and not df_view["BB_Upper"].dropna().empty:
-            visible_max = max(visible_max, float(df_view["BB_Upper"].max()))
+        # Get Y range of the loaded chart data (df_chart) to prevent any off-screen clipping during horizontal panning
+        chart_min = float(df_chart["Low"].min())
+        chart_max = float(df_chart["High"].max())
+        if "BB_Lower" in df_chart.columns and not df_chart["BB_Lower"].dropna().empty:
+            chart_min = min(chart_min, float(df_chart["BB_Lower"].min()))
+        if "BB_Upper" in df_chart.columns and not df_chart["BB_Upper"].dropna().empty:
+            chart_max = max(chart_max, float(df_chart["BB_Upper"].max()))
         if pred_price:
-            visible_min = min(visible_min, pred_price)
-            visible_max = max(visible_max, pred_price)
+            chart_min = min(chart_min, pred_price)
+            chart_max = max(chart_max, pred_price)
 
-        padding = (visible_max - visible_min) * 0.05
+        padding = (chart_max - chart_min) * 0.05
         if padding == 0:
-            padding = visible_min * 0.05 if visible_min > 0 else 1.0
-        y_min = max(0.0, visible_min - padding)
-        y_max = visible_max + padding
+            padding = chart_min * 0.05 if chart_min > 0 else 1.0
+        y_min = max(0.0, chart_min - padding)
+        y_max = chart_max + padding
 
         l = base_layout()
         l["height"] = 520
@@ -929,12 +937,12 @@ with main_col:
 
             # Band fill between 30 and 70
             fig_rsi.add_trace(go.Scatter(
-                x=df["Date"], y=[70]*len(df),
+                x=df_chart["Date"], y=[70]*len(df_chart),
                 line=dict(color="rgba(255,77,109,0.4)", width=1, dash="dot"),
                 showlegend=False, hoverinfo="skip"
             ))
             fig_rsi.add_trace(go.Scatter(
-                x=df["Date"], y=[30]*len(df),
+                x=df_chart["Date"], y=[30]*len(df_chart),
                 fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
                 line=dict(color="rgba(0,245,160,0.4)", width=1, dash="dot"),
                 showlegend=False, hoverinfo="skip"
@@ -942,7 +950,7 @@ with main_col:
 
             # RSI line
             fig_rsi.add_trace(go.Scatter(
-                x=df["Date"], y=df["RSI"],
+                x=df_chart["Date"], y=df_chart["RSI"],
                 line=dict(color=BLUE, width=1.8),
                 name="RSI(14)",
                 hovertemplate="RSI: %{y:.1f}<extra></extra>"
@@ -969,7 +977,7 @@ with main_col:
             fig_macd = go.Figure()
 
             # MACD histogram with opacity gradient
-            hist_vals = df["Hist"].fillna(0)
+            hist_vals = df_chart["Hist"].fillna(0)
             max_hist = hist_vals.abs().max()
             if max_hist == 0:
                 max_hist = 1
@@ -980,23 +988,23 @@ with main_col:
             ]
 
             fig_macd.add_trace(go.Bar(
-                x=df["Date"], y=hist_vals,
+                x=df_chart["Date"], y=hist_vals,
                 marker_color=hist_colors, name="Histogram",
                 hovertemplate="Hist: %{y:.4f}<extra></extra>"
             ))
             fig_macd.add_trace(go.Scatter(
-                x=df["Date"], y=df["MACD"],
+                x=df_chart["Date"], y=df_chart["MACD"],
                 line=dict(color=BLUE, width=1.5), name="MACD",
                 hovertemplate="MACD: %{y:.4f}<extra></extra>"
             ))
             fig_macd.add_trace(go.Scatter(
-                x=df["Date"], y=df["Signal"],
+                x=df_chart["Date"], y=df_chart["Signal"],
                 line=dict(color=YELLOW, width=1.5), name="Signal",
                 hovertemplate="Signal: %{y:.4f}<extra></extra>"
             ))
-            # Calculate visible MACD range to prevent squishing
-            macd_min = min(float(df_view["MACD"].min()), float(df_view["Signal"].min()), float(df_view["Hist"].min()))
-            macd_max = max(float(df_view["MACD"].max()), float(df_view["Signal"].max()), float(df_view["Hist"].max()))
+            # Calculate range of MACD to prevent squishing based on loaded df_chart data
+            macd_min = min(float(df_chart["MACD"].min()), float(df_chart["Signal"].min()), float(df_chart["Hist"].min()))
+            macd_max = max(float(df_chart["MACD"].max()), float(df_chart["Signal"].max()), float(df_chart["Hist"].max()))
             macd_pad = (macd_max - macd_min) * 0.05
             if macd_pad == 0:
                 macd_pad = abs(macd_min) * 0.05 if macd_min != 0 else 1.0
@@ -1013,31 +1021,31 @@ with main_col:
                 config={"scrollZoom": True, "responsive": True, "displayModeBar": False})
 
         st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
-        vol_colors = [GREEN if df["Close"].iloc[i] >= df["Open"].iloc[i]
-                      else RED for i in range(len(df))]
+        vol_colors = [GREEN if df_chart["Close"].iloc[i] >= df_chart["Open"].iloc[i]
+                      else RED for i in range(len(df_chart))]
         fig_vol = go.Figure()
         fig_vol.add_trace(go.Bar(
-            x=df["Date"], y=df["Volume"],
+            x=df_chart["Date"], y=df_chart["Volume"],
             marker_color=vol_colors, opacity=0.7, name="Volume",
             hovertemplate="Vol: %{y:,.0f}<extra></extra>"
         ))
-        vol_ma = df["Volume"].rolling(20).mean()
+        vol_ma = df_chart["Volume"].rolling(20).mean()
         fig_vol.add_trace(go.Scatter(
-            x=df["Date"], y=vol_ma,
+            x=df_chart["Date"], y=vol_ma,
             line=dict(color=YELLOW, width=1.5), name="Vol MA 20",
             hovertemplate="Vol MA20: %{y:,.0f}<extra></extra>"
         ))
         # Vol MA annotation
         if not vol_ma.dropna().empty:
             fig_vol.add_annotation(
-                x=df["Date"].iloc[-1],
+                x=df_chart["Date"].iloc[-1],
                 y=float(vol_ma.iloc[-1]),
                 text="  Vol MA20",
                 showarrow=False,
                 font=dict(color=YELLOW, size=8, family="Space Mono"),
                 xanchor="left"
             )
-        vol_max = float(df_view["Volume"].max())
+        vol_max = float(df_chart["Volume"].max())
         l4 = base_layout("Volume")
         l4["height"] = 180
         l4["xaxis"]["range"] = [start_view, end_view]
