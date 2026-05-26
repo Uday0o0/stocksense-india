@@ -818,6 +818,23 @@ with main_col:
                 hovertemplate="LSTM Pred: ₹%{y:,.2f}<extra></extra>"
             ))
 
+        # Get visible Y range for initial scaling (including BB bands and predictions if any)
+        visible_min = float(df_view["Low"].min())
+        visible_max = float(df_view["High"].max())
+        if "BB_Lower" in df_view.columns and not df_view["BB_Lower"].dropna().empty:
+            visible_min = min(visible_min, float(df_view["BB_Lower"].min()))
+        if "BB_Upper" in df_view.columns and not df_view["BB_Upper"].dropna().empty:
+            visible_max = max(visible_max, float(df_view["BB_Upper"].max()))
+        if pred_price:
+            visible_min = min(visible_min, pred_price)
+            visible_max = max(visible_max, pred_price)
+
+        padding = (visible_max - visible_min) * 0.05
+        if padding == 0:
+            padding = visible_min * 0.05 if visible_min > 0 else 1.0
+        y_min = max(0.0, visible_min - padding)
+        y_max = visible_max + padding
+
         l = base_layout()
         l["height"] = 520
         l["xaxis"]["range"] = [start_view, end_view]
@@ -825,6 +842,7 @@ with main_col:
         l["dragmode"] = "pan"        # enables pan by default
         l["xaxis"]["fixedrange"] = False
         l["yaxis"]["fixedrange"] = True
+        l["yaxis"]["range"] = [y_min, y_max]
         fig_price.update_layout(**l)
 
         # ── CHART + INDICATOR PANEL SIDE BY SIDE ──
@@ -976,11 +994,19 @@ with main_col:
                 line=dict(color=YELLOW, width=1.5), name="Signal",
                 hovertemplate="Signal: %{y:.4f}<extra></extra>"
             ))
+            # Calculate visible MACD range to prevent squishing
+            macd_min = min(float(df_view["MACD"].min()), float(df_view["Signal"].min()), float(df_view["Hist"].min()))
+            macd_max = max(float(df_view["MACD"].max()), float(df_view["Signal"].max()), float(df_view["Hist"].max()))
+            macd_pad = (macd_max - macd_min) * 0.05
+            if macd_pad == 0:
+                macd_pad = abs(macd_min) * 0.05 if macd_min != 0 else 1.0
+
             l3 = base_layout("MACD (12, 26, 9)")
             l3["height"] = 220
             l3["xaxis"]["range"] = [start_view, end_view]
             l3["xaxis"]["fixedrange"] = False
             l3["yaxis"]["fixedrange"] = True
+            l3["yaxis"]["range"] = [macd_min - macd_pad, macd_max + macd_pad]
             l3["margin"] = dict(l=12, r=12, t=40, b=12)
             fig_macd.update_layout(**l3)
             st.plotly_chart(fig_macd, use_container_width=True,
@@ -1011,11 +1037,13 @@ with main_col:
                 font=dict(color=YELLOW, size=8, family="Space Mono"),
                 xanchor="left"
             )
+        vol_max = float(df_view["Volume"].max())
         l4 = base_layout("Volume")
         l4["height"] = 180
         l4["xaxis"]["range"] = [start_view, end_view]
         l4["xaxis"]["fixedrange"] = False
         l4["yaxis"]["fixedrange"] = True
+        l4["yaxis"]["range"] = [0, vol_max * 1.05]
         l4["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_vol.update_layout(**l4)
         st.plotly_chart(fig_vol, use_container_width=True,
