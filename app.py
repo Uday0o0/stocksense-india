@@ -28,6 +28,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+def clean_html(html_str):
+    return "\n".join(line.lstrip() for line in html_str.split("\n"))
 
 # ─── CUSTOM CSS ─────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -489,16 +491,7 @@ st.markdown(index_html, unsafe_allow_html=True)
 
 
 # ── LOAD DATA & MODEL ────────────────────────────────────────
-# Stock selector dropdown directly here
-col_stock, col_range, col_refresh = st.columns([2, 2, 1])
-
-with col_stock:
-    stock_name = st.selectbox(
-        "Select Stock",
-        list(STOCKS.keys()),
-        index=0,
-        key="stock_selector"
-    )
+col_range, col_refresh = st.columns([4, 1])
 
 with col_range:
     range_option = st.selectbox(
@@ -517,14 +510,14 @@ with col_refresh:
         st.rerun()
 
 # ── STOCK SELECTION STATE ────────────────────────────────────
-if "stock_selector" not in st.session_state:
-    st.session_state["stock_selector"] = "Reliance Industries"
+if "selected_stock" not in st.session_state:
+    st.session_state["selected_stock"] = "Reliance Industries"
 
-# Ensure stock selector is in STOCKS keys
-if st.session_state["stock_selector"] not in STOCKS:
-    st.session_state["stock_selector"] = list(STOCKS.keys())[0]
+# Ensure selected stock is in STOCKS keys
+if st.session_state["selected_stock"] not in STOCKS:
+    st.session_state["selected_stock"] = list(STOCKS.keys())[0]
 
-stock_name = st.session_state["stock_selector"]
+stock_name = st.session_state["selected_stock"]
 
 @st.cache_data(ttl=300)
 def get_stock_summary(ticker):
@@ -584,32 +577,28 @@ with left_col:
                             color:{pred_clr};margin-top:2px;">
                     🔮 {pred_sym} ₹{pred_p:,.0f}</div>"""
 
-            is_selected = "border-color:rgba(0,245,160,0.4);" if sname == stock_name else ""
+            is_selected = "border-color:#00F5A0;box-shadow:0 0 10px rgba(0,245,160,0.15);" if sname == stock_name else ""
             sc = SECTOR_COLORS.get(sdata["sector"], "#5A7499")
+            btn_label = "Analyzing" if sname == stock_name else "View"
 
-            # Layout stock card
-            col_sname, col_sbtn = st.columns([1.8, 1])
-            with col_sname:
-                st.markdown(f"""
-                <div style="font-family:Syne,sans-serif;font-size:0.75rem;font-weight:700;color:#E0E6F0;margin-top:4px;">
-                    {sname}
-                </div>""", unsafe_allow_html=True)
-            with col_sbtn:
-                if st.button("View", key=f"btn_{sname}", use_container_width=True):
-                    st.session_state["stock_selector"] = sname
-                    st.rerun()
-            
-            st.markdown(f"""
+            card_html = f"""
             <div style="background:#0D1525;border:1px solid #1E2D4A;{is_selected}
-                        border-radius:8px;padding:8px 12px;margin-bottom:12px;">
-                <div style="display:flex;justify-content:space-between;">
-                    <span style="font-family:Syne,sans-serif;font-size:0.8rem;
-                                 font-weight:700;color:#E0E6F0;">₹{curr_p:,.2f}</span>
-                    <span style="font-family:Space Mono;font-size:0.6rem;
-                                 color:{clr};">{sym} {abs(pct_p):.2f}%</span>
+                        border-radius:8px;padding:12px;margin-bottom:6px;">
+                <div style="font-family:Syne,sans-serif;font-size:0.8rem;font-weight:700;color:#E0E6F0;margin-bottom:6px;">
+                    {sname}
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-family:Space Mono;font-size:0.8rem;font-weight:700;color:#E0E6F0;">₹{curr_p:,.2f}</span>
+                    <span style="font-family:Space Mono;font-size:0.65rem;color:{clr};">{sym} {abs(pct_p):.2f}%</span>
                 </div>
                 {pred_html}
-            </div>""", unsafe_allow_html=True)
+            </div>"""
+            
+            st.markdown(clean_html(card_html), unsafe_allow_html=True)
+            if st.button(btn_label, key=f"btn_{sname}", use_container_width=True):
+                st.session_state["selected_stock"] = sname
+                st.rerun()
+            st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
 
 with main_col:
     # ── STOCK DETAILS & METRICS ──
@@ -637,8 +626,8 @@ with main_col:
 
     df = add_indicators(df)
 
+    cutoff = pd.Timestamp(datetime.today() - timedelta(days=days_back)) if days_back < 9999 else df["Date"].iloc[0]
     if days_back < 9999:
-        cutoff  = pd.Timestamp(datetime.today() - timedelta(days=days_back))
         df_view = df[df["Date"] >= cutoff].copy()
     else:
         df_view = df.copy()
@@ -692,41 +681,41 @@ with main_col:
 
     with c1:
         cc = "metric-card metric-card-bull" if day_change >= 0 else "metric-card metric-card-bear"
-        st.markdown(f"""
+        st.markdown(clean_html(f"""
         <div class="{cc}">
             <div class="metric-label">Current Price</div>
             <div class="metric-value">₹{latest_close:,.2f}</div>
             <div class="metric-sub {chg_class}">{chg_symbol} ₹{abs(day_change):.2f} ({abs(day_pct):.2f}%) today</div>
-        </div>""", unsafe_allow_html=True)
+        </div>"""), unsafe_allow_html=True)
 
     with c2:
         if pred_price:
             pc = "bullish" if pred_change >= 0 else "bearish"
             pk = "metric-card metric-card-bull" if pred_change >= 0 else "metric-card metric-card-bear"
             ps = "▲" if pred_change >= 0 else "▼"
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="{pk}">
                 <div class="metric-label">Tomorrow's Prediction</div>
                 <div class="metric-value">₹{pred_price:,.2f}</div>
                 <div class="metric-sub {pc}">{ps} ₹{abs(pred_change):.2f} ({abs(pred_pct):.2f}%) · {pred_day.strftime("%d %b")}</div>
-            </div>""", unsafe_allow_html=True)
+            </div>"""), unsafe_allow_html=True)
 
     with c3:
         rsi_val   = float(df["RSI"].iloc[-1])
         rsi_class = "bullish" if rsi_val < 40 else ("bearish" if rsi_val > 65 else "neutral")
         rsi_lbl   = "Oversold" if rsi_val < 30 else ("Overbought" if rsi_val > 70 else "Neutral")
         rsi_card  = "metric-card metric-card-bull" if rsi_val < 40 else ("metric-card metric-card-bear" if rsi_val > 65 else "metric-card metric-card-neutral")
-        st.markdown(f"""
+        st.markdown(clean_html(f"""
         <div class="{rsi_card}">
             <div class="metric-label">RSI (14)</div>
             <div class="metric-value">{rsi_val:.1f}</div>
             <div class="metric-sub {rsi_class}">{rsi_lbl}</div>
-        </div>""", unsafe_allow_html=True)
+        </div>"""), unsafe_allow_html=True)
 
     with c4:
         if w52_low and w52_high:
             pos_pct = ((latest_close - w52_low) / (w52_high - w52_low) * 100) if w52_high != w52_low else 50
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="metric-card">
                 <div class="metric-label">52-Week Range</div>
                 <div class="metric-value" style="font-size:1rem;">₹{latest_close:,.0f}</div>
@@ -736,17 +725,17 @@ with main_col:
                 <div class="accuracy-bar-wrap">
                     <div class="accuracy-bar-fill" style="width:{pos_pct:.0f}%"></div>
                 </div>
-            </div>""", unsafe_allow_html=True)
+            </div>"""), unsafe_allow_html=True)
 
     with c5:
-        st.markdown(f"""
+        st.markdown(clean_html(f"""
         <div class="metric-card">
             <div class="metric-label">Signal</div>
             <div class="metric-value" style="font-size:1.1rem;padding-top:6px;">
                 <span class="signal-badge {badge_class}">{signal}</span>
             </div>
             <div class="metric-sub" style="margin-top:10px;color:#3A5070;">RSI + MA cross</div>
-        </div>""", unsafe_allow_html=True)
+        </div>"""), unsafe_allow_html=True)
 
     # ─── TABS ────────────────────────────────────────────────────────────────────────
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -760,11 +749,15 @@ with main_col:
 
         fig_price = go.Figure()
 
+        # Initial view range
+        start_view = max(cutoff, df["Date"].iloc[0])
+        end_view = df["Date"].iloc[-1] + pd.Timedelta(days=5)
+
         # Candlestick — improved styling
         fig_price.add_trace(go.Candlestick(
-            x=df_view["Date"],
-            open=df_view["Open"], high=df_view["High"],
-            low=df_view["Low"],   close=df_view["Close"],
+            x=df["Date"],
+            open=df["Open"], high=df["High"],
+            low=df["Low"],   close=df["Close"],
             increasing=dict(line=dict(color="#00F5A0", width=1.2), fillcolor="rgba(0,245,160,0.75)"),
             decreasing=dict(line=dict(color="#FF4D6D", width=1.2), fillcolor="rgba(255,77,109,0.75)"),
             whiskerwidth=0.3,
@@ -773,20 +766,20 @@ with main_col:
 
         # Bollinger Bands
         fig_price.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["BB_Upper"],
+            x=df["Date"], y=df["BB_Upper"],
             line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
             name="BB Upper",
             hovertemplate="BB Upper: ₹%{y:,.2f}<extra></extra>"
         ))
         fig_price.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["BB_Lower"],
+            x=df["Date"], y=df["BB_Lower"],
             fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
             line=dict(color="rgba(0,217,245,0.3)", width=1, dash="dot"),
             name="BB Lower",
             hovertemplate="BB Lower: ₹%{y:,.2f}<extra></extra>"
         ))
         fig_price.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["BB_Mid"],
+            x=df["Date"], y=df["BB_Mid"],
             line=dict(color="rgba(0,217,245,0.5)", width=1),
             name="BB Mid",
             hovertemplate="BB Mid: ₹%{y:,.2f}<extra></extra>"
@@ -794,13 +787,13 @@ with main_col:
 
         # Moving Averages
         fig_price.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["MA50"],
+            x=df["Date"], y=df["MA50"],
             line=dict(color=YELLOW, width=1.5),
             name="MA 50",
             hovertemplate="MA50: ₹%{y:,.2f}<extra></extra>"
         ))
         fig_price.add_trace(go.Scatter(
-            x=df_view["Date"], y=df_view["MA200"],
+            x=df["Date"], y=df["MA200"],
             line=dict(color="#FF6B9D", width=1.5),
             name="MA 200",
             hovertemplate="MA200: ₹%{y:,.2f}<extra></extra>"
@@ -827,10 +820,11 @@ with main_col:
 
         l = base_layout()
         l["height"] = 520
+        l["xaxis"]["range"] = [start_view, end_view]
         l["xaxis"]["rangeslider"] = dict(visible=False)
         l["dragmode"] = "pan"        # enables pan by default
         l["xaxis"]["fixedrange"] = False
-        l["yaxis"]["fixedrange"] = False
+        l["yaxis"]["fixedrange"] = True
         fig_price.update_layout(**l)
 
         # ── CHART + INDICATOR PANEL SIDE BY SIDE ──
@@ -848,7 +842,7 @@ with main_col:
 
         with info_col:
             # Live indicator values shown on the right
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div style="background:#0D1525;border:1px solid #1E2D4A;border-radius:8px;
                         padding:12px;font-family:Space Mono;font-size:0.62rem;
                         position:sticky;top:0;">
@@ -858,57 +852,56 @@ with main_col:
 
                 <div style="margin-bottom:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">MA 50</div>
-                    <div style="color:#F5C518;font-weight:700;">₹{float(df_view['MA50'].iloc[-1]):,.2f}</div>
+                    <div style="color:#F5C518;font-weight:700;">₹{float(df['MA50'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-bottom:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">MA 200</div>
-                    <div style="color:#FF6B9D;font-weight:700;">₹{float(df_view['MA200'].iloc[-1]):,.2f}</div>
+                    <div style="color:#FF6B9D;font-weight:700;">₹{float(df['MA200'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-bottom:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">BB Upper</div>
-                    <div style="color:rgba(0,217,245,0.8);font-weight:700;">₹{float(df_view['BB_Upper'].iloc[-1]):,.2f}</div>
+                    <div style="color:rgba(0,217,245,0.8);font-weight:700;">₹{float(df['BB_Upper'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-bottom:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">BB Mid</div>
-                    <div style="color:rgba(0,217,245,0.6);font-weight:700;">₹{float(df_view['BB_Mid'].iloc[-1]):,.2f}</div>
+                    <div style="color:rgba(0,217,245,0.6);font-weight:700;">₹{float(df['BB_Mid'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-bottom:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">BB Lower</div>
-                    <div style="color:rgba(0,217,245,0.8);font-weight:700;">₹{float(df_view['BB_Lower'].iloc[-1]):,.2f}</div>
+                    <div style="color:rgba(0,217,245,0.8);font-weight:700;">₹{float(df['BB_Lower'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="border-top:1px solid #1E2D4A;padding-top:10px;margin-top:4px;">
                     <div style="color:#5A7499;font-size:0.58rem;">RSI (14)</div>
-                    <div style="color:{'#00F5A0' if float(df_view['RSI'].iloc[-1]) < 40 else '#FF4D6D' if float(df_view['RSI'].iloc[-1]) > 65 else '#F5C518'};font-weight:700;">
-                        {float(df_view['RSI'].iloc[-1]):.1f}</div>
+                    <div style="color:{'#00F5A0' if float(df['RSI'].iloc[-1]) < 40 else '#FF4D6D' if float(df['RSI'].iloc[-1]) > 65 else '#F5C518'};font-weight:700;">
+                        {float(df['RSI'].iloc[-1]):.1f}</div>
                 </div>
                 <div style="margin-top:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">MACD</div>
-                    <div style="color:{'#00F5A0' if float(df_view['MACD'].iloc[-1]) > float(df_view['Signal'].iloc[-1]) else '#FF4D6D'};font-weight:700;">
-                        {float(df_view['MACD'].iloc[-1]):,.2f}</div>
+                    <div style="color:{'#00F5A0' if float(df['MACD'].iloc[-1]) > float(df['Signal'].iloc[-1]) else '#FF4D6D'};font-weight:700;">
+                        {float(df['MACD'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-top:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">Signal</div>
                     <div style="color:#F5C518;font-weight:700;">
-                        {float(df_view['Signal'].iloc[-1]):,.2f}</div>
+                        {float(df['Signal'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-top:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">Open</div>
-                    <div style="color:#E0E6F0;font-weight:700;">₹{float(df_view['Open'].iloc[-1]):,.2f}</div>
+                    <div style="color:#E0E6F0;font-weight:700;">₹{float(df['Open'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-top:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">High</div>
-                    <div style="color:#00F5A0;font-weight:700;">₹{float(df_view['High'].iloc[-1]):,.2f}</div>
+                    <div style="color:#00F5A0;font-weight:700;">₹{float(df['High'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-top:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">Low</div>
-                    <div style="color:#FF4D6D;font-weight:700;">₹{float(df_view['Low'].iloc[-1]):,.2f}</div>
+                    <div style="color:#FF4D6D;font-weight:700;">₹{float(df['Low'].iloc[-1]):,.2f}</div>
                 </div>
                 <div style="margin-top:10px;">
                     <div style="color:#5A7499;font-size:0.58rem;">Volume</div>
-                    <div style="color:#E0E6F0;font-weight:700;">{float(df_view['Volume'].iloc[-1])/1e6:.2f}M</div>
+                    <div style="color:#E0E6F0;font-weight:700;">{float(df['Volume'].iloc[-1])/1e6:.2f}M</div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+            </div>"""), unsafe_allow_html=True)
 
         st.markdown('<div class="section-header">Indicators</div>', unsafe_allow_html=True)
         col_rsi, col_macd = st.columns(2)
@@ -918,12 +911,12 @@ with main_col:
 
             # Band fill between 30 and 70
             fig_rsi.add_trace(go.Scatter(
-                x=df_view["Date"], y=[70]*len(df_view),
+                x=df["Date"], y=[70]*len(df),
                 line=dict(color="rgba(255,77,109,0.4)", width=1, dash="dot"),
                 showlegend=False, hoverinfo="skip"
             ))
             fig_rsi.add_trace(go.Scatter(
-                x=df_view["Date"], y=[30]*len(df_view),
+                x=df["Date"], y=[30]*len(df),
                 fill="tonexty", fillcolor="rgba(0,217,245,0.04)",
                 line=dict(color="rgba(0,245,160,0.4)", width=1, dash="dot"),
                 showlegend=False, hoverinfo="skip"
@@ -931,7 +924,7 @@ with main_col:
 
             # RSI line
             fig_rsi.add_trace(go.Scatter(
-                x=df_view["Date"], y=df_view["RSI"],
+                x=df["Date"], y=df["RSI"],
                 line=dict(color=BLUE, width=1.8),
                 name="RSI(14)",
                 hovertemplate="RSI: %{y:.1f}<extra></extra>"
@@ -945,6 +938,9 @@ with main_col:
 
             l2 = base_layout("RSI (14)")
             l2["height"] = 220
+            l2["xaxis"]["range"] = [start_view, end_view]
+            l2["xaxis"]["fixedrange"] = False
+            l2["yaxis"]["fixedrange"] = True
             l2["yaxis"]["range"] = [0, 100]
             l2["margin"] = dict(l=12, r=12, t=40, b=12)
             fig_rsi.update_layout(**l2)
@@ -955,7 +951,7 @@ with main_col:
             fig_macd = go.Figure()
 
             # MACD histogram with opacity gradient
-            hist_vals = df_view["Hist"].fillna(0)
+            hist_vals = df["Hist"].fillna(0)
             max_hist = hist_vals.abs().max()
             if max_hist == 0:
                 max_hist = 1
@@ -966,46 +962,49 @@ with main_col:
             ]
 
             fig_macd.add_trace(go.Bar(
-                x=df_view["Date"], y=hist_vals,
+                x=df["Date"], y=hist_vals,
                 marker_color=hist_colors, name="Histogram",
                 hovertemplate="Hist: %{y:.4f}<extra></extra>"
             ))
             fig_macd.add_trace(go.Scatter(
-                x=df_view["Date"], y=df_view["MACD"],
+                x=df["Date"], y=df["MACD"],
                 line=dict(color=BLUE, width=1.5), name="MACD",
                 hovertemplate="MACD: %{y:.4f}<extra></extra>"
             ))
             fig_macd.add_trace(go.Scatter(
-                x=df_view["Date"], y=df_view["Signal"],
+                x=df["Date"], y=df["Signal"],
                 line=dict(color=YELLOW, width=1.5), name="Signal",
                 hovertemplate="Signal: %{y:.4f}<extra></extra>"
             ))
             l3 = base_layout("MACD (12, 26, 9)")
             l3["height"] = 220
+            l3["xaxis"]["range"] = [start_view, end_view]
+            l3["xaxis"]["fixedrange"] = False
+            l3["yaxis"]["fixedrange"] = True
             l3["margin"] = dict(l=12, r=12, t=40, b=12)
             fig_macd.update_layout(**l3)
             st.plotly_chart(fig_macd, use_container_width=True,
                 config={"scrollZoom": True, "responsive": True, "displayModeBar": False})
 
         st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
-        vol_colors = [GREEN if df_view["Close"].iloc[i] >= df_view["Open"].iloc[i]
-                      else RED for i in range(len(df_view))]
+        vol_colors = [GREEN if df["Close"].iloc[i] >= df["Open"].iloc[i]
+                      else RED for i in range(len(df))]
         fig_vol = go.Figure()
         fig_vol.add_trace(go.Bar(
-            x=df_view["Date"], y=df_view["Volume"],
+            x=df["Date"], y=df["Volume"],
             marker_color=vol_colors, opacity=0.7, name="Volume",
             hovertemplate="Vol: %{y:,.0f}<extra></extra>"
         ))
-        vol_ma = df_view["Volume"].rolling(20).mean()
+        vol_ma = df["Volume"].rolling(20).mean()
         fig_vol.add_trace(go.Scatter(
-            x=df_view["Date"], y=vol_ma,
+            x=df["Date"], y=vol_ma,
             line=dict(color=YELLOW, width=1.5), name="Vol MA 20",
             hovertemplate="Vol MA20: %{y:,.0f}<extra></extra>"
         ))
         # Vol MA annotation
         if not vol_ma.dropna().empty:
             fig_vol.add_annotation(
-                x=df_view["Date"].iloc[-1],
+                x=df["Date"].iloc[-1],
                 y=float(vol_ma.iloc[-1]),
                 text="  Vol MA20",
                 showarrow=False,
@@ -1014,6 +1013,9 @@ with main_col:
             )
         l4 = base_layout("Volume")
         l4["height"] = 180
+        l4["xaxis"]["range"] = [start_view, end_view]
+        l4["xaxis"]["fixedrange"] = False
+        l4["yaxis"]["fixedrange"] = True
         l4["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_vol.update_layout(**l4)
         st.plotly_chart(fig_vol, use_container_width=True,
@@ -1029,29 +1031,29 @@ with main_col:
         macd_cross = "🟢 Bullish" if macd_now > sig_now else "🔴 Bearish"
 
         with d1:
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="stat-box"><div class="stat-label">Volume Today</div>
             <div class="stat-value">{vol_today/1e6:.2f}M</div></div>
             <div class="stat-box"><div class="stat-label">Avg Volume (20D)</div>
-            <div class="stat-value">{vol_avg/1e6:.2f}M</div></div>""", unsafe_allow_html=True)
+            <div class="stat-value">{vol_avg/1e6:.2f}M</div></div>"""), unsafe_allow_html=True)
         with d2:
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="stat-box"><div class="stat-label">52W High</div>
             <div class="stat-value bullish">₹{w52_high:,.2f}</div></div>
             <div class="stat-box"><div class="stat-label">52W Low</div>
-            <div class="stat-value bearish">₹{w52_low:,.2f}</div></div>""", unsafe_allow_html=True)
+            <div class="stat-value bearish">₹{w52_low:,.2f}</div></div>"""), unsafe_allow_html=True)
         with d3:
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="stat-box"><div class="stat-label">MA 50</div>
             <div class="stat-value">₹{float(df['MA50'].iloc[-1]):,.2f}</div></div>
             <div class="stat-box"><div class="stat-label">MA 200</div>
-            <div class="stat-value">₹{float(df['MA200'].iloc[-1]):,.2f}</div></div>""", unsafe_allow_html=True)
+            <div class="stat-value">₹{float(df['MA200'].iloc[-1]):,.2f}</div></div>"""), unsafe_allow_html=True)
         with d4:
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="stat-box"><div class="stat-label">MACD Signal</div>
             <div class="stat-value" style="font-size:0.85rem;">{macd_cross}</div></div>
             <div class="stat-box"><div class="stat-label">Sector</div>
-            <div class="stat-value" style="font-size:0.85rem;color:{SECTOR_COLORS.get(sector,'#5A7499')}">{sector}</div></div>""",
+            <div class="stat-value" style="font-size:0.85rem;color:{SECTOR_COLORS.get(sector,'#5A7499')}">{sector}</div></div>"""),
             unsafe_allow_html=True)
 
     # ════════════ TAB 2 — 7-DAY FORECAST ════════════
@@ -1074,13 +1076,13 @@ with main_col:
                 sym   = "▲" if chg >= 0 else "▼"
                 conf  = confidence_scores[i]
                 with col:
-                    st.markdown(f"""
+                    st.markdown(clean_html(f"""
                     <div class="forecast-card">
                         <div class="forecast-day">{day.strftime("%a")}<br>{day.strftime("%d %b")}</div>
                         <div class="forecast-price">₹{price:,.0f}</div>
                         <div class="forecast-change" style="color:{color}">{sym} {abs(pct):.1f}%</div>
                         <div style="font-family:Space Mono;font-size:0.55rem;color:#3A5070;margin-top:6px;">~{conf:.0f}% conf.</div>
-                    </div>""", unsafe_allow_html=True)
+                    </div>"""), unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
             fig_fc = go.Figure()
@@ -1157,22 +1159,22 @@ with main_col:
 
             m1, m2, m3, m4, m5 = st.columns(5)
             with m1:
-                st.markdown(f"""<div class="stat-box"><div class="stat-label">R² Score</div>
+                st.markdown(clean_html(f"""<div class="stat-box"><div class="stat-label">R² Score</div>
                 <div class="stat-value" style="color:{r2c}">{r2:.4f}</div>
                 <div class="accuracy-bar-wrap"><div class="accuracy-bar-fill" style="width:{acc:.0f}%"></div></div>
-                </div>""", unsafe_allow_html=True)
+                </div>"""), unsafe_allow_html=True)
             with m2:
-                st.markdown(f"""<div class="stat-box"><div class="stat-label">MAE</div>
-                <div class="stat-value">₹{mae:.2f}</div></div>""", unsafe_allow_html=True)
+                st.markdown(clean_html(f"""<div class="stat-box"><div class="stat-label">MAE</div>
+                <div class="stat-value">₹{mae:.2f}</div></div>"""), unsafe_allow_html=True)
             with m3:
-                st.markdown(f"""<div class="stat-box"><div class="stat-label">MAPE</div>
-                <div class="stat-value">{mape:.2f}%</div></div>""", unsafe_allow_html=True)
+                st.markdown(clean_html(f"""<div class="stat-box"><div class="stat-label">MAPE</div>
+                <div class="stat-value">{mape:.2f}%</div></div>"""), unsafe_allow_html=True)
             with m4:
-                st.markdown(f"""<div class="stat-box"><div class="stat-label">Days Tested</div>
-                <div class="stat-value">{len(bt_dates)}</div></div>""", unsafe_allow_html=True)
+                st.markdown(clean_html(f"""<div class="stat-box"><div class="stat-label">Days Tested</div>
+                <div class="stat-value">{len(bt_dates)}</div></div>"""), unsafe_allow_html=True)
             with m5:
-                st.markdown(f"""<div class="stat-box"><div class="stat-label">Direction Accuracy</div>
-                <div class="stat-value" style="color:#00F5A0">{dir_acc:.1f}%</div></div>""", unsafe_allow_html=True)
+                st.markdown(clean_html(f"""<div class="stat-box"><div class="stat-label">Direction Accuracy</div>
+                <div class="stat-value" style="color:#00F5A0">{dir_acc:.1f}%</div></div>"""), unsafe_allow_html=True)
 
             st.markdown('<div class="section-header">Baseline Comparison</div>', unsafe_allow_html=True)
             baseline_cols = st.columns(3)
@@ -1186,23 +1188,23 @@ with main_col:
             for col, (label, card_mape, card_mae, card_dir) in zip(baseline_cols, baseline_cards):
                 color = "#00F5A0" if card_mape == best_mape else "#5A7499"
                 with col:
-                    st.markdown(f"""
+                    st.markdown(clean_html(f"""
                     <div class="stat-box">
                         <div class="stat-label">{label}</div>
                         <div class="stat-value" style="color:{color}">{card_mape:.2f}%</div>
                         <div style="font-family:Space Mono;font-size:0.62rem;color:#5A7499;margin-top:6px;">
                             MAE ₹{card_mae:.2f} · Dir {card_dir:.1f}%
                         </div>
-                    </div>""", unsafe_allow_html=True)
+                    </div>"""), unsafe_allow_html=True)
 
             lift_color = "#00F5A0" if lift_vs_naive > 0 else "#FF4D6D"
             lift_word = "beats" if lift_vs_naive > 0 else "trails"
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="warn-box" style="border-color:rgba(0,245,160,0.2);background:rgba(0,245,160,0.03);color:#5A7499;">
                 LSTM {lift_word} the naive close baseline by
                 <span style="color:{lift_color}">{abs(lift_vs_naive):.2f} MAPE points</span>
                 over this period.
-            </div>""", unsafe_allow_html=True)
+            </div>"""), unsafe_allow_html=True)
 
             fig_bt = go.Figure()
             fig_bt.add_trace(go.Scatter(
@@ -1239,11 +1241,11 @@ with main_col:
             fig_err.update_layout(**le)
             st.plotly_chart(fig_err, use_container_width=True, config=CHART_CONFIG)
 
-            st.markdown(f"""
+            st.markdown(clean_html(f"""
             <div class="warn-box" style="border-color:rgba(0,245,160,0.2);background:rgba(0,245,160,0.03);color:#5A7499;">
                 💡 <span style="color:#00F5A0">Tip:</span> Use <b>24–36 months</b> for the most reliable R² score.
                 Current direction accuracy: <span style="color:#00F5A0">{dir_acc:.1f}%</span>
-            </div>""", unsafe_allow_html=True)
+            </div>"""), unsafe_allow_html=True)
 
     # ════════════ TAB 4 — ABOUT ════════════
     with tab4:
@@ -1251,7 +1253,7 @@ with main_col:
         a1, a2 = st.columns(2)
 
         with a1:
-            st.markdown("""
+            st.markdown(clean_html("""
             <div class="about-card">
                 <div class="about-title">🧠 How It Works</div>
                 <div class="about-text">
@@ -1271,22 +1273,22 @@ with main_col:
                     <b style="color:#E0E6F0">Bollinger Bands (20,2)</b> — Volatility bands that expand/contract with market conditions.<br><br>
                     <b style="color:#E0E6F0">MA 50 & MA 200</b> — Short and long-term trend lines. Golden cross = bullish signal.
                 </div>
-            </div>""", unsafe_allow_html=True)
+            </div>"""), unsafe_allow_html=True)
 
         with a2:
-            st.markdown('<div class="about-card"><div class="about-title">🏦 Covered Stocks</div><div class="about-text">',
+            st.markdown(clean_html('<div class="about-card"><div class="about-title">🏦 Covered Stocks</div><div class="about-text">'),
                         unsafe_allow_html=True)
             for sname, sdata in STOCKS.items():
                 sc2 = SECTOR_COLORS.get(sdata['sector'], '#5A7499')
-                st.markdown(f"""
+                st.markdown(clean_html(f"""
                 <div style="display:flex;justify-content:space-between;padding:5px 0;
                             border-bottom:1px solid #1E2D4A;font-family:Space Mono;font-size:0.65rem;">
                     <span style="color:#E0E6F0">{sname}</span>
                     <span style="color:{sc2}">{sdata['sector']}</span>
-                </div>""", unsafe_allow_html=True)
+                </div>"""), unsafe_allow_html=True)
             st.markdown("</div></div>", unsafe_allow_html=True)
 
-            st.markdown("""
+            st.markdown(clean_html("""
             <div class="about-card">
                 <div class="about-title">⚙️ Tech Stack</div>
                 <div class="about-text">
@@ -1300,17 +1302,17 @@ with main_col:
                         <span style="background:rgba(0,245,160,0.1);border:1px solid rgba(0,245,160,0.3);color:#00F5A0;padding:3px 10px;border-radius:4px;font-size:0.65rem;">scikit-learn</span>
                     </div>
                 </div>
-            </div>""", unsafe_allow_html=True)
+            </div>"""), unsafe_allow_html=True)
 
-        st.markdown("""
+        st.markdown(clean_html("""
         <div class="warn-box" style="margin-top:16px;">
             ⚠️ <b>Disclaimer:</b> StockSense India is built purely for educational purposes.
             Predictions should NOT be used as financial advice. Always consult a SEBI-registered
             financial advisor before making investment decisions.
-        </div>""", unsafe_allow_html=True)
+        </div>"""), unsafe_allow_html=True)
 
     # ─── FOOTER ──────────────────────────────────────────────────────────────────────
-    st.markdown("""
+    st.markdown(clean_html("""
     <div class="footer">
         <div class="footer-logo">StockSense India</div>
         <div class="footer-text">Built with LSTM · TensorFlow · Streamlit · Data via yfinance</div>
@@ -1319,4 +1321,4 @@ with main_col:
         </div>
         <div class="footer-text" style="margin-top:8px;">© 2026 · For educational use only · Not financial advice</div>
     </div>
-    """, unsafe_allow_html=True)
+    """), unsafe_allow_html=True)
