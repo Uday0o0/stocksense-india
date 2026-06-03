@@ -31,6 +31,136 @@ st.set_page_config(
 def clean_html(html_str):
     return "\n".join(line.lstrip() for line in html_str.split("\n"))
 
+
+def st_plotly_chart_autoscale(fig, height=520, allow_negative=False, min_at_zero=False, show_mode_bar=True):
+    import json
+    fig_json = fig.to_json()
+    
+    html_template = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+            html, body, #chart-div {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                background-color: transparent;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="chart-div"></div>
+        <script>
+            const fig = __FIG_JSON__;
+            
+            // Apply responsive settings
+            fig.layout.autosize = true;
+            
+            const config = {
+                scrollZoom: true,
+                displayModeBar: __SHOW_MODE_BAR__,
+                modeBarButtonsToRemove: ["lasso2d", "select2d"],
+                modeBarButtonsToAdd: ["drawline", "eraseshape"],
+                responsive: true
+            };
+            
+            Plotly.newPlot('chart-div', fig.data, fig.layout, config);
+            
+            const gd = document.getElementById('chart-div');
+            
+            function parseDate(dateStr) {
+                if (typeof dateStr === 'number') return dateStr;
+                if (typeof dateStr === 'string') {
+                    const match = dateStr.match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})/);
+                    if (match) {
+                        return new Date(match[1] + "T00:00:00Z").getTime();
+                    }
+                }
+                return new Date(dateStr).getTime();
+            }
+            
+            function autoscaleY() {
+                const xRange = gd._fullLayout.xaxis.range;
+                if (!xRange || xRange.length < 2) return;
+                
+                const xMin = parseDate(xRange[0]);
+                const xMax = parseDate(xRange[1]);
+                
+                let yMin = Infinity;
+                let yMax = -Infinity;
+                
+                gd.data.forEach(trace => {
+                    if (!trace.x) return;
+                    for (let i = 0; i < trace.x.length; i++) {
+                        const xVal = parseDate(trace.x[i]);
+                        if (xVal >= xMin && xVal <= xMax) {
+                            if (trace.type === 'candlestick') {
+                                if (trace.low && trace.low[i] !== null && trace.low[i] !== undefined) {
+                                    yMin = Math.min(yMin, trace.low[i]);
+                                }
+                                if (trace.high && trace.high[i] !== null && trace.high[i] !== undefined) {
+                                    yMax = Math.max(yMax, trace.high[i]);
+                                }
+                            } else if (trace.y && trace.y[i] !== null && trace.y[i] !== undefined) {
+                                const yVal = trace.y[i];
+                                if (typeof yVal === 'number' && !isNaN(yVal)) {
+                                    yMin = Math.min(yMin, yVal);
+                                    yMax = Math.max(yMax, yVal);
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                if (yMin !== Infinity && yMax !== -Infinity) {
+                    const padding = (yMax - yMin) * 0.05;
+                    let newYMin = yMin - padding;
+                    let newYMax = yMax + padding;
+                    
+                    if (__MIN_AT_ZERO__) {
+                        newYMin = 0.0;
+                    } else if (!__ALLOW_NEGATIVE__) {
+                        newYMin = Math.max(0.0, newYMin);
+                    }
+                    
+                    Plotly.relayout(gd, {
+                        'yaxis.range': [newYMin, newYMax]
+                    });
+                }
+            }
+            
+            let isRelayouting = false;
+            gd.on('plotly_relayout', function(eventData) {
+                if (isRelayouting) return;
+                
+                const hasXZoom = eventData['xaxis.range[0]'] !== undefined || 
+                                  eventData['xaxis.range'] !== undefined ||
+                                  eventData['xaxis.autorange'] !== undefined;
+                                  
+                if (hasXZoom) {
+                    isRelayouting = true;
+                    autoscaleY();
+                    isRelayouting = false;
+                }
+            });
+        </script>
+    </body>
+    </html>
+    """
+    html_content = html_template.replace("__FIG_JSON__", fig_json)
+    html_content = html_content.replace("__MIN_AT_ZERO__", "true" if min_at_zero else "false")
+    html_content = html_content.replace("__ALLOW_NEGATIVE__", "true" if allow_negative else "false")
+    html_content = html_content.replace("__SHOW_MODE_BAR__", "true" if show_mode_bar else "false")
+    
+    import streamlit.components.v1 as components
+    components.html(html_content, height=height)
+
+
 # ─── CUSTOM CSS ─────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -547,58 +677,59 @@ with left_col:
                 margin-bottom:12px;">Stocks</div>
     """, unsafe_allow_html=True)
 
-    for sname, sdata in STOCKS.items():
-        summary = get_stock_summary(sdata["ticker"])
-        if summary is not None:
-            curr_p = summary["current"]
-            pct_p = summary["pct"]
-            chg_p = summary["change"]
-            clr = "#00F5A0" if chg_p >= 0 else "#FF4D6D"
-            sym = "▲" if chg_p >= 0 else "▼"
-            
-            # Predict
-            pred_p = None
-            try:
-                m, s = load_model_and_scaler(sdata["model"])
-                if m is not None:
-                    full_d = load_data(sdata["ticker"])
-                    if full_d is not None and not full_d.empty:
-                        pred_p = predict_tomorrow(m, s, full_d)
-            except Exception:
-                pass
+    with st.container(height=1000, border=False):
+        for sname, sdata in STOCKS.items():
+            summary = get_stock_summary(sdata["ticker"])
+            if summary is not None:
+                curr_p = summary["current"]
+                pct_p = summary["pct"]
+                chg_p = summary["change"]
+                clr = "#00F5A0" if chg_p >= 0 else "#FF4D6D"
+                sym = "▲" if chg_p >= 0 else "▼"
+                
+                # Predict
+                pred_p = None
+                try:
+                    m, s = load_model_and_scaler(sdata["model"])
+                    if m is not None:
+                        full_d = load_data(sdata["ticker"])
+                        if full_d is not None and not full_d.empty:
+                            pred_p = predict_tomorrow(m, s, full_d)
+                except Exception:
+                    pass
 
-            pred_html = ""
-            if pred_p:
-                pred_chg = pred_p - curr_p
-                pred_clr = "#00F5A0" if pred_chg >= 0 else "#FF4D6D"
-                pred_sym = "▲" if pred_chg >= 0 else "▼"
-                pred_html = f"""
-                <div style="font-family:Space Mono;font-size:0.58rem;
-                            color:{pred_clr};margin-top:2px;">
-                    🔮 {pred_sym} ₹{pred_p:,.0f}</div>"""
+                pred_html = ""
+                if pred_p:
+                    pred_chg = pred_p - curr_p
+                    pred_clr = "#00F5A0" if pred_chg >= 0 else "#FF4D6D"
+                    pred_sym = "▲" if pred_chg >= 0 else "▼"
+                    pred_html = f"""
+                    <div style="font-family:Space Mono;font-size:0.58rem;
+                                color:{pred_clr};margin-top:2px;">
+                        🔮 {pred_sym} ₹{pred_p:,.0f}</div>"""
 
-            is_selected = "border-color:#00F5A0;box-shadow:0 0 10px rgba(0,245,160,0.15);" if sname == stock_name else ""
-            sc = SECTOR_COLORS.get(sdata["sector"], "#5A7499")
-            btn_label = "Analyzing" if sname == stock_name else "View"
+                is_selected = "border-color:#00F5A0;box-shadow:0 0 10px rgba(0,245,160,0.15);" if sname == stock_name else ""
+                sc = SECTOR_COLORS.get(sdata["sector"], "#5A7499")
+                btn_label = "Analyzing" if sname == stock_name else "View"
 
-            card_html = f"""
-            <div style="background:#0D1525;border:1px solid #1E2D4A;{is_selected}
-                        border-radius:8px;padding:12px;margin-bottom:6px;">
-                <div style="font-family:Syne,sans-serif;font-size:0.8rem;font-weight:700;color:#E0E6F0;margin-bottom:6px;">
-                    {sname}
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span style="font-family:Space Mono;font-size:0.8rem;font-weight:700;color:#E0E6F0;">₹{curr_p:,.2f}</span>
-                    <span style="font-family:Space Mono;font-size:0.65rem;color:{clr};">{sym} {abs(pct_p):.2f}%</span>
-                </div>
-                {pred_html}
-            </div>"""
-            
-            st.markdown(clean_html(card_html), unsafe_allow_html=True)
-            if st.button(btn_label, key=f"btn_{sname}", use_container_width=True):
-                st.session_state["selected_stock"] = sname
-                st.rerun()
-            st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
+                card_html = f"""
+                <div style="background:#0D1525;border:1px solid #1E2D4A;{is_selected}
+                            border-radius:8px;padding:12px;margin-bottom:6px;">
+                    <div style="font-family:Syne,sans-serif;font-size:0.8rem;font-weight:700;color:#E0E6F0;margin-bottom:6px;">
+                        {sname}
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-family:Space Mono;font-size:0.8rem;font-weight:700;color:#E0E6F0;">₹{curr_p:,.2f}</span>
+                        <span style="font-family:Space Mono;font-size:0.65rem;color:{clr};">{sym} {abs(pct_p):.2f}%</span>
+                    </div>
+                    {pred_html}
+                </div>"""
+                
+                st.markdown(clean_html(card_html), unsafe_allow_html=True)
+                if st.button(btn_label, key=f"btn_{sname}", use_container_width=True):
+                    st.session_state["selected_stock"] = sname
+                    st.rerun()
+                st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
 
 with main_col:
     # ── STOCK DETAILS & METRICS ──
@@ -857,14 +988,7 @@ with main_col:
         chart_col, info_col = st.columns([4, 1])
 
         with chart_col:
-            st.plotly_chart(fig_price, use_container_width=True,
-                            config={
-                                "scrollZoom": True,        # mouse wheel zoom
-                                "displayModeBar": True,
-                                "modeBarButtonsToRemove": ["lasso2d", "select2d"],
-                                "modeBarButtonsToAdd":    ["drawline", "eraseshape"],
-                                "responsive": True
-                            })
+            st_plotly_chart_autoscale(fig_price, height=520, allow_negative=False, min_at_zero=False, show_mode_bar=True)
 
         with info_col:
             # Live indicator values shown on the right
@@ -1017,8 +1141,7 @@ with main_col:
             l3["yaxis"]["range"] = [macd_min - macd_pad, macd_max + macd_pad]
             l3["margin"] = dict(l=12, r=12, t=40, b=12)
             fig_macd.update_layout(**l3)
-            st.plotly_chart(fig_macd, use_container_width=True,
-                config={"scrollZoom": True, "responsive": True, "displayModeBar": False})
+            st_plotly_chart_autoscale(fig_macd, height=220, allow_negative=True, min_at_zero=False, show_mode_bar=False)
 
         st.markdown('<div class="section-header">Volume</div>', unsafe_allow_html=True)
         vol_colors = [GREEN if df_chart["Close"].iloc[i] >= df_chart["Open"].iloc[i]
@@ -1054,8 +1177,7 @@ with main_col:
         l4["yaxis"]["range"] = [0, vol_max * 1.05]
         l4["margin"] = dict(l=12, r=12, t=40, b=12)
         fig_vol.update_layout(**l4)
-        st.plotly_chart(fig_vol, use_container_width=True,
-            config={"scrollZoom": True, "responsive": True, "displayModeBar": False})
+        st_plotly_chart_autoscale(fig_vol, height=180, allow_negative=False, min_at_zero=True, show_mode_bar=False)
 
         # Stock Details
         st.markdown('<div class="section-header">Stock Details</div>', unsafe_allow_html=True)
