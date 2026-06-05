@@ -22,7 +22,7 @@ def cache_resource(func):
 def load_model_and_scaler(model_name):
     from keras.models import load_model
 
-    model_path = os.path.join(SAVE_DIR, "models", f"{model_name}_model.keras")
+    model_path = os.path.join(SAVE_DIR, f"{model_name}_model.keras")
     scaler_path = os.path.join(SAVE_DIR, "scalers", f"{model_name}_scaler.pkl")
     if not os.path.exists(model_path) or not os.path.exists(scaler_path):
         return None, None
@@ -35,7 +35,7 @@ def load_model_and_scaler(model_name):
 
 def get_model_artifact_info(model_name):
     artifacts = {
-        "model": os.path.join(SAVE_DIR, "models", f"{model_name}_model.keras"),
+        "model": os.path.join(SAVE_DIR, f"{model_name}_model.keras"),
         "scaler": os.path.join(SAVE_DIR, "scalers", f"{model_name}_scaler.pkl"),
     }
     info = {}
