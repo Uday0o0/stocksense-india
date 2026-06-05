@@ -1,7 +1,9 @@
 from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 import yfinance as yf
+
 
 @st.cache_data(ttl=300)
 def load_data(ticker):
@@ -19,27 +21,17 @@ def load_data(ticker):
                 continue
             if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
+            data.index.name = "Date"
             data = data.reset_index()
             if "Date" not in data.columns:
-                date_col = [c for c in data.columns if "date" in str(c).lower() or "index" in str(c).lower()]
-                if date_col:
-                    data = data.rename(columns={date_col[0]: "Date"})
-                else:
-                    data["Date"] = data.index
-            data["Date"] = pd.to_datetime(data["Date"]).dt.tz_localize(None)
-            data = data.sort_values("Date").reset_index(drop=True)
-            col_map = {}
-            for col in data.columns:
-                for standard in ["Open", "High", "Low", "Close", "Volume"]:
-                    if str(col).lower() == standard.lower() and col != standard:
-                        col_map[col] = standard
-            if col_map:
-                data = data.rename(columns=col_map)
+                data["Date"] = data.index
+            data["Date"] = pd.to_datetime(data["Date"])
             return data
         except Exception:
             if attempt == 2:
                 return None
     return None
+
 
 @st.cache_data(ttl=600)
 def load_index_data():
@@ -47,7 +39,7 @@ def load_index_data():
     result = {}
     for name, ticker in indices.items():
         try:
-            data = yf.download(ticker, period="5d", progress=False, timeout=15, auto_adjust=True)
+            data = yf.download(ticker, period="5d", progress=False, timeout=15)
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex):
                     data.columns = data.columns.get_level_values(0)
