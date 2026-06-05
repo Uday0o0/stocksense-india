@@ -1179,6 +1179,7 @@ with main_col:
         fig_vol.update_layout(**l4)
         st_plotly_chart_autoscale(fig_vol, height=180, allow_negative=False, min_at_zero=True, show_mode_bar=False)
 
+
         # Stock Details
         st.markdown('<div class="section-header">Stock Details</div>', unsafe_allow_html=True)
         d1, d2, d3, d4 = st.columns(4)
